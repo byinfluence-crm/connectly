@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/Button';
-import { supabase } from '@/lib/supabase';
+import { supabase, getMarketplaceUser } from '@/lib/supabase';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -29,7 +29,19 @@ export default function LoginPage() {
       return;
     }
 
-    router.push('/discover');
+    // Redirigir según user_type
+    try {
+      const userId = (await supabase.auth.getUser()).data.user?.id;
+      if (userId) {
+        const profile = await getMarketplaceUser(userId);
+        router.push(profile.user_type === 'influencer' ? '/dashboard/creator' : '/dashboard/brand');
+        router.refresh();
+        return;
+      }
+    } catch {
+      // Si falla la consulta, ir al dashboard genérico que redirecciona
+    }
+    router.push('/dashboard');
     router.refresh();
   };
 

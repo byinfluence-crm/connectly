@@ -73,7 +73,7 @@ function RegisterForm() {
       }
     }
 
-    router.push('/discover');
+    router.push(role === 'influencer' ? '/dashboard/creator' : '/dashboard/brand');
     router.refresh();
   };
 
