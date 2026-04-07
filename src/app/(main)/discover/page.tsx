@@ -5,13 +5,11 @@ import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Avatar from '@/components/ui/Avatar';
 import { useCredits } from '@/lib/hooks/useCredits';
+import { useAuth } from '@/components/AuthProvider';
 import {
   Search, SlidersHorizontal, Star, Shield, Zap, MapPin,
   Users, TrendingUp, Lock, MessageCircle, ChevronRight, Flame
 } from 'lucide-react';
-
-// userId provisional hasta que Auth esté conectado
-const MOCK_USER_ID: string | null = null;
 
 /* ─── MOCK DATA ────────────────────────────────────────────────────── */
 // Imágenes: picsum.photos (licencia CC0 — sin copyright, uso libre)
@@ -536,7 +534,8 @@ export default function DiscoverPage() {
   const [city, setCity] = useState('Todas');
   const [query, setQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
-  const { credits, loading: unlocking, unlock, persistedUnlocked } = useCredits(MOCK_USER_ID);
+  const { user } = useAuth();
+  const { credits, loading: unlocking, unlock, persistedUnlocked } = useCredits(user?.id ?? null);
 
   // persistedUnlocked viene del hook (cargado desde Supabase al montar + actualizado al desbloquear)
   // isUnlocked recibe string IDs — compara como string para evitar type mismatch

@@ -1,18 +1,36 @@
 'use client';
 import Link from 'next/link';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/Button';
+import { supabase } from '@/lib/supabase';
 
 export default function LoginPage() {
+  const router = useRouter();
   const [form, setForm] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    await new Promise(r => setTimeout(r, 1000));
-    setLoading(false);
-    window.location.href = '/dashboard';
+    setError('');
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: form.email,
+      password: form.password,
+    });
+
+    if (error) {
+      setError(error.message === 'Invalid login credentials'
+        ? 'Email o contraseña incorrectos'
+        : error.message);
+      setLoading(false);
+      return;
+    }
+
+    router.push('/discover');
+    router.refresh();
   };
 
   return (
@@ -31,7 +49,7 @@ export default function LoginPage() {
             Tus colaboraciones te esperan. Entra y sigue construyendo conexiones que funcionan.
           </p>
         </div>
-        <p className="text-violet-400 text-xs">© 2025 Connectly · by Byinfluence</p>
+        <p className="text-violet-400 text-xs">© 2026 Connectly · by Byinfluence</p>
       </div>
 
       {/* Right form */}
@@ -64,7 +82,9 @@ export default function LoginPage() {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-sm font-medium text-gray-700">Contraseña</label>
-                <Link href="/forgot" className="text-xs text-violet-600 hover:text-violet-700 font-medium">¿Olvidaste tu contraseña?</Link>
+                <Link href="/forgot" className="text-xs text-violet-600 hover:text-violet-700 font-medium">
+                  ¿Olvidaste tu contraseña?
+                </Link>
               </div>
               <input
                 type="password"
@@ -75,6 +95,13 @@ export default function LoginPage() {
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all bg-white"
               />
             </div>
+
+            {error && (
+              <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600">
+                {error}
+              </div>
+            )}
+
             <Button type="submit" fullWidth size="lg" loading={loading}>
               {loading ? 'Entrando...' : 'Entrar'}
             </Button>

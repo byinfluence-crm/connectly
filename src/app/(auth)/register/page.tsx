@@ -1,28 +1,80 @@
 'use client';
 import Link from 'next/link';
 import { useState, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Button from '@/components/ui/Button';
 import { ArrowRight, TrendingUp, Star } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+
+const NICHES = ['Gastronomía', 'Moda', 'Fitness', 'Viajes', 'Lifestyle', 'Tecnología', 'Belleza', 'Deporte', 'Gaming', 'Otro'];
+const CITIES = ['Madrid', 'Barcelona', 'Sevilla', 'Valencia', 'Bilbao', 'Málaga', 'Zaragoza', 'Otra'];
 
 function RegisterForm() {
+  const router = useRouter();
   const params = useSearchParams();
   const defaultRole = params.get('role') as 'brand' | 'influencer' | null;
+
   const [role, setRole] = useState<'brand' | 'influencer'>(defaultRole || 'brand');
   const [step, setStep] = useState<1 | 2>(1);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [form, setForm] = useState({ name: '', email: '', password: '', city: '', niche: '' });
-
-  const niches = ['Gastronomía', 'Moda', 'Fitness', 'Viajes', 'Lifestyle', 'Tecnología', 'Belleza', 'Deporte', 'Gaming', 'Otro'];
-  const cities = ['Madrid', 'Barcelona', 'Sevilla', 'Valencia', 'Bilbao', 'Málaga', 'Zaragoza', 'Otra'];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (step === 1) { setStep(2); return; }
+
+    // Paso 1 → paso 2
+    if (step === 1) {
+      setStep(2);
+      return;
+    }
+
     setLoading(true);
-    await new Promise(r => setTimeout(r, 1500));
-    setLoading(false);
-    window.location.href = '/dashboard';
+    setError('');
+
+    // 1. Crear usuario en Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: form.email,
+      password: form.password,
+      options: {
+        data: { display_name: form.name, user_type: role },
+      },
+    });
+
+    if (authError) {
+      setError(authError.message === 'User already registered'
+        ? 'Ya existe una cuenta con ese email'
+        : authError.message);
+      setLoading(false);
+      return;
+    }
+
+    const userId = authData.user?.id;
+    if (!userId) {
+      setError('Error al crear la cuenta. Inténtalo de nuevo.');
+      setLoading(false);
+      return;
+    }
+
+    // 2. Crear perfil en marketplace_users (20 créditos de bienvenida)
+    const { error: profileError } = await supabase.from('marketplace_users').insert({
+      id: userId,
+      user_type: role,
+      display_name: form.name,
+      city: form.city || null,
+      niche: form.niche || null,
+      credits: 20,
+    });
+
+    if (profileError) {
+      // Si ya existe (trigger en Supabase lo creó antes), no es error crítico
+      if (!profileError.message.includes('duplicate')) {
+        console.error('Profile insert error:', profileError.message);
+      }
+    }
+
+    router.push('/discover');
+    router.refresh();
   };
 
   return (
@@ -37,10 +89,14 @@ function RegisterForm() {
         </Link>
         <div>
           <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center mb-6">
-            {role === 'brand' ? <TrendingUp size={26} className="text-white" /> : <Star size={26} className="text-amber-300" />}
+            {role === 'brand'
+              ? <TrendingUp size={26} className="text-white" />
+              : <Star size={26} className="text-amber-300" />}
           </div>
           <h2 className="text-2xl font-bold text-white mb-4 leading-snug">
-            {role === 'brand' ? 'Encuentra al creador perfecto para tu marca' : 'Recibe propuestas de marcas que encajan contigo'}
+            {role === 'brand'
+              ? 'Encuentra al creador perfecto para tu marca'
+              : 'Recibe propuestas de marcas que encajan contigo'}
           </h2>
           <p className="text-violet-300 text-sm leading-relaxed mb-8">
             {role === 'brand'
@@ -59,7 +115,7 @@ function RegisterForm() {
             ))}
           </div>
         </div>
-        <p className="text-violet-400 text-xs">© 2025 Connectly · by Byinfluence</p>
+        <p className="text-violet-400 text-xs">© 2026 Connectly · by Byinfluence</p>
       </div>
 
       {/* Right form */}
@@ -75,7 +131,7 @@ function RegisterForm() {
 
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Crear cuenta</h1>
-            <p className="text-gray-500 text-sm">1 mes gratis · Sin tarjeta de crédito</p>
+            <p className="text-gray-500 text-sm">1 mes gratis · Sin tarjeta de crédito · 20 créditos de regalo</p>
           </div>
 
           {/* Role selector */}
@@ -83,6 +139,7 @@ function RegisterForm() {
             {(['brand', 'influencer'] as const).map(r => (
               <button
                 key={r}
+                type="button"
                 onClick={() => setRole(r)}
                 className={`py-2.5 rounded-lg text-sm font-semibold transition-all ${role === r ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
               >
@@ -157,7 +214,7 @@ function RegisterForm() {
                     className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white"
                   >
                     <option value="">Selecciona ciudad</option>
-                    {cities.map(c => <option key={c} value={c}>{c}</option>)}
+                    {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div>
@@ -165,7 +222,7 @@ function RegisterForm() {
                     {role === 'brand' ? 'Sector' : 'Nicho principal'}
                   </label>
                   <div className="flex flex-wrap gap-2">
-                    {niches.map(n => (
+                    {NICHES.map(n => (
                       <button
                         key={n}
                         type="button"
@@ -177,6 +234,13 @@ function RegisterForm() {
                     ))}
                   </div>
                 </div>
+
+                {error && (
+                  <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600">
+                    {error}
+                  </div>
+                )}
+
                 <Button type="submit" fullWidth size="lg" loading={loading}>
                   {loading ? 'Creando cuenta...' : 'Crear cuenta gratis'}
                 </Button>
