@@ -204,3 +204,62 @@ export async function updateApplicationStatus(
     .eq('brand_id', brandId); // RLS extra: solo la marca propietaria puede actualizar
   if (error) throw error;
 }
+
+/** Datos de una aplicación concreta (para el chat). */
+export async function getApplicationById(appId: string): Promise<{
+  id: string;
+  status: string;
+  creator_id: string;
+  brand_id: string;
+  creator: { display_name: string } | null;
+  brand: { display_name: string } | null;
+  collab: { title: string } | null;
+} | null> {
+  const { data } = await supabase
+    .from('collab_applications')
+    .select(`
+      id, status, creator_id, brand_id,
+      creator:marketplace_users!creator_id ( display_name ),
+      brand:marketplace_users!brand_id ( display_name ),
+      collab:collabs!collab_id ( title )
+    `)
+    .eq('id', appId)
+    .single();
+  return data as typeof data & null;
+}
+
+// ─── Chat / Messages ──────────────────────────────────────────────────────────
+
+export interface Message {
+  id: string;
+  application_id: string;
+  sender_id: string;
+  content: string;
+  created_at: string;
+}
+
+/** Historial de mensajes de una aplicación. */
+export async function getMessages(applicationId: string): Promise<Message[]> {
+  const { data, error } = await supabase
+    .from('messages')
+    .select('id, application_id, sender_id, content, created_at')
+    .eq('application_id', applicationId)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as Message[];
+}
+
+/** Envía un mensaje. Lanza error si el contenido contiene un teléfono. */
+export async function sendMessage(
+  applicationId: string,
+  senderId: string,
+  content: string,
+): Promise<Message> {
+  const { data, error } = await supabase
+    .from('messages')
+    .insert({ application_id: applicationId, sender_id: senderId, content })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Message;
+}

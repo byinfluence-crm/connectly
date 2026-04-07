@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   Plus, Search, Zap, Users, TrendingUp, Clock, CheckCircle,
   XCircle, ChevronRight, MapPin, LogOut, Flame, Eye,
-  FileText, MoreHorizontal, Star,
+  FileText, MoreHorizontal, Star, MessageCircle,
 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
@@ -355,6 +355,15 @@ export default function BrandDashboard() {
                         >
                           <XCircle size={14} /> Rechazar
                         </button>
+                      </div>
+                    )}
+                    {app.status === 'accepted' && (
+                      <div className="flex gap-2 mt-3 pt-3 border-t border-gray-50">
+                        <Link href={`/chat/${app.id}`} className="flex-1">
+                          <button className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-violet-50 text-violet-700 text-xs font-semibold hover:bg-violet-100 transition-colors">
+                            <MessageCircle size={14} /> Abrir chat
+                          </button>
+                        </Link>
                       </div>
                     )}
                   </div>

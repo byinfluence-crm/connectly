@@ -293,9 +293,11 @@ export default function CreatorDashboard() {
                       </div>
                     </div>
                     {app.status === 'accepted' && (
-                      <Button size="sm" variant="secondary" className="flex-shrink-0 text-xs">
-                        Contactar
-                      </Button>
+                      <Link href={`/chat/${app.id}`}>
+                        <Button size="sm" variant="secondary" className="flex-shrink-0 text-xs">
+                          Chat
+                        </Button>
+                      </Link>
                     )}
                   </div>
                 ))}
