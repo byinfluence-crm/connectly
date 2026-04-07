@@ -127,6 +127,7 @@ export interface CollabApplication {
 }
 
 export interface ApplicationWithCollab extends CollabApplication {
+  collab_status?: string | null;
   collab: {
     id: string;
     title: string;
@@ -137,6 +138,7 @@ export interface ApplicationWithCollab extends CollabApplication {
 }
 
 export interface ApplicationWithCreator extends CollabApplication {
+  collab_status?: string | null;
   creator: {
     id: string;
     display_name: string;
@@ -199,7 +201,7 @@ export async function getApplicationsByCreator(creatorId: string): Promise<Appli
   const { data, error } = await supabase
     .from('collab_applications')
     .select(`
-      id, collab_id, creator_id, brand_id, status, message, created_at,
+      id, collab_id, creator_id, brand_id, status, collab_status, message, created_at,
       collab:collabs!collab_id (
         id, title, type, budget,
         brand:marketplace_users!brand_id ( display_name )
@@ -217,7 +219,7 @@ export async function getApplicationsByBrand(brandId: string): Promise<Applicati
   const { data, error } = await supabase
     .from('collab_applications')
     .select(`
-      id, collab_id, creator_id, brand_id, status, message, created_at,
+      id, collab_id, creator_id, brand_id, status, collab_status, message, created_at,
       creator:marketplace_users!creator_id ( id, display_name, city, niche ),
       collab:collabs!collab_id ( id, title, type, budget )
     `)
@@ -299,4 +301,226 @@ export async function sendMessage(
     .single();
   if (error) throw error;
   return data as Message;
+}
+
+// ─── Deliveries ───────────────────────────────────────────────────────────────
+
+export interface CollabDelivery {
+  id: string;
+  application_id: string;
+  influencer_id: string;
+  post_urls: string[];
+  content_types: string[];
+  reach: number | null;
+  impressions: number | null;
+  interactions: number | null;
+  video_views: number | null;
+  stories_count: number | null;
+  story_views_avg: number | null;
+  link_clicks: number | null;
+  story_replies: number | null;
+  sticker_taps: number | null;
+  submitted_at: string;
+}
+
+export interface DeliveryInput {
+  post_urls: string[];
+  content_types: string[];
+  reach?: number;
+  impressions?: number;
+  interactions?: number;
+  video_views?: number;
+  stories_count?: number;
+  story_views_avg?: number;
+  link_clicks?: number;
+  story_replies?: number;
+  sticker_taps?: number;
+}
+
+/** Guarda la entrega del influencer y actualiza el estado de la aplicación. */
+export async function submitDelivery(
+  applicationId: string,
+  influencerId: string,
+  data: DeliveryInput,
+): Promise<void> {
+  const { error: delErr } = await supabase
+    .from('collaboration_deliveries')
+    .insert({ application_id: applicationId, influencer_id: influencerId, ...data });
+  if (delErr) throw delErr;
+
+  const { error: statusErr } = await supabase
+    .from('collab_applications')
+    .update({ collab_status: 'pending_brand_review' })
+    .eq('id', applicationId);
+  if (statusErr) throw statusErr;
+}
+
+/** Obtiene la entrega de una aplicación (para que la vea la marca). */
+export async function getDelivery(applicationId: string): Promise<CollabDelivery | null> {
+  const { data } = await supabase
+    .from('collaboration_deliveries')
+    .select('*')
+    .eq('application_id', applicationId)
+    .maybeSingle();
+  return data as CollabDelivery | null;
+}
+
+// ─── Reviews ─────────────────────────────────────────────────────────────────
+
+export interface Review {
+  id: string;
+  application_id: string | null;
+  reviewer_id: string;
+  reviewed_id: string;
+  reviewer_role: 'brand' | 'influencer';
+  rating: number;
+  rating_communication: number | null;
+  rating_professionalism: number | null;
+  rating_results: number | null;
+  would_repeat: boolean | null;
+  comment: string | null;
+  created_at: string;
+  reviewer?: { display_name: string } | null;
+}
+
+export interface InfluencerReviewInput {
+  rating: number;
+  rating_communication: number;
+  rating_professionalism: number;
+  rating_results: number;
+  would_repeat: boolean;
+  comment: string;
+}
+
+export interface BrandReviewInput {
+  rating: number;
+  rating_communication: number;
+  rating_professionalism: number;
+  rating_results: number;
+  would_repeat: boolean;
+  comment: string;
+}
+
+/**
+ * El influencer deja su reseña sobre la marca.
+ * Internamente también crea la notificación para la marca.
+ */
+export async function submitInfluencerReview(
+  applicationId: string,
+  influencerId: string,
+  brandId: string,
+  input: InfluencerReviewInput,
+): Promise<void> {
+  const { error } = await supabase.from('reviews').insert({
+    application_id: applicationId,
+    reviewer_id: influencerId,
+    reviewed_id: brandId,
+    reviewer_role: 'influencer',
+    ...input,
+  });
+  if (error) throw error;
+
+  // Notificación a la marca
+  await supabase.from('notifications').insert({
+    user_id: brandId,
+    type: 'pending_brand_review',
+    title: 'El creador ha completado la colaboración',
+    body: 'Ha dejado una reseña sobre tu marca. Para ver los resultados y estadísticas, deja tu valoración del creador.',
+    data: { application_id: applicationId },
+  });
+}
+
+/**
+ * La marca deja su reseña sobre el influencer.
+ * Marca la colaboración como completada y notifica al influencer.
+ */
+export async function submitBrandReview(
+  applicationId: string,
+  brandId: string,
+  influencerId: string,
+  input: BrandReviewInput,
+): Promise<void> {
+  const { error } = await supabase.from('reviews').insert({
+    application_id: applicationId,
+    reviewer_id: brandId,
+    reviewed_id: influencerId,
+    reviewer_role: 'brand',
+    ...input,
+  });
+  if (error) throw error;
+
+  // Marcar colaboración como completada
+  const { error: statusErr } = await supabase
+    .from('collab_applications')
+    .update({ collab_status: 'completed' })
+    .eq('id', applicationId);
+  if (statusErr) throw statusErr;
+
+  // Notificación al influencer
+  await supabase.from('notifications').insert({
+    user_id: influencerId,
+    type: 'review_published',
+    title: 'La marca ha valorado tu colaboración',
+    body: 'Tu reseña y la de la marca ya son públicas en tu perfil. ¡Sigue sumando!',
+    data: { application_id: applicationId },
+  });
+}
+
+/** Reseñas reales de marcas sobre un creador (para /creators/[id]). */
+export async function getReviewsForCreator(creatorId: string): Promise<Review[]> {
+  const { data } = await supabase
+    .from('reviews')
+    .select(`
+      id, application_id, reviewer_id, reviewed_id, reviewer_role,
+      rating, rating_communication, rating_professionalism, rating_results,
+      would_repeat, comment, created_at,
+      reviewer:marketplace_users!reviewer_id ( display_name )
+    `)
+    .eq('reviewed_id', creatorId)
+    .eq('reviewer_role', 'brand')
+    .order('created_at', { ascending: false });
+  return (data ?? []) as unknown as Review[];
+}
+
+/** Reseñas reales de creadores sobre una marca (para /brands/[id]). */
+export async function getReviewsForBrand(brandId: string): Promise<Review[]> {
+  const { data } = await supabase
+    .from('reviews')
+    .select(`
+      id, application_id, reviewer_id, reviewed_id, reviewer_role,
+      rating, rating_communication, rating_professionalism, rating_results,
+      would_repeat, comment, created_at,
+      reviewer:marketplace_users!reviewer_id ( display_name )
+    `)
+    .eq('reviewed_id', brandId)
+    .eq('reviewer_role', 'influencer')
+    .order('created_at', { ascending: false });
+  return (data ?? []) as unknown as Review[];
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+export interface AppNotification {
+  id: string;
+  user_id: string;
+  type: string;
+  title: string;
+  body: string;
+  read: boolean;
+  data: Record<string, unknown>;
+  created_at: string;
+}
+
+export async function getNotifications(userId: string): Promise<AppNotification[]> {
+  const { data } = await supabase
+    .from('notifications')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(20);
+  return (data ?? []) as AppNotification[];
+}
+
+export async function markNotificationRead(notificationId: string): Promise<void> {
+  await supabase.from('notifications').update({ read: true }).eq('id', notificationId);
 }

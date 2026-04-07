@@ -4,13 +4,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Search, TrendingUp, Clock, CheckCircle, ChevronRight,
-  MapPin, Flame, LogOut, FileText, User, Send,
+  MapPin, Flame, LogOut, FileText, User, Send, Upload,
 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import { useAuth } from '@/components/AuthProvider';
 import { supabase, getApplicationsByCreator } from '@/lib/supabase';
 import type { ApplicationWithCollab } from '@/lib/supabase';
+import DeliveryModal from '@/components/DeliveryModal';
 
 /* ─── MOCK DATA ─────────────────────────────────────────────────── */
 const MOCK_APPLICATIONS = [
@@ -126,6 +127,7 @@ export default function CreatorDashboard() {
   const router = useRouter();
   const [applications, setApplications] = useState<ApplicationWithCollab[]>([]);
   const [loadingApps, setLoadingApps] = useState(true);
+  const [deliveryApp, setDeliveryApp] = useState<ApplicationWithCollab | null>(null);
 
   const displayName = (user?.user_metadata?.display_name as string) ?? 'Creador';
 
@@ -149,6 +151,22 @@ export default function CreatorDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {deliveryApp && user && (
+        <DeliveryModal
+          applicationId={deliveryApp.id}
+          influencerId={user.id}
+          brandId={deliveryApp.brand_id}
+          brandName={(deliveryApp.collab?.brand as { display_name: string } | null)?.display_name ?? 'Marca'}
+          collabTitle={deliveryApp.collab?.title ?? ''}
+          onClose={() => setDeliveryApp(null)}
+          onDone={() => {
+            setDeliveryApp(null);
+            setApplications(prev =>
+              prev.map(a => a.id === deliveryApp.id ? { ...a, collab_status: 'pending_brand_review' } : a)
+            );
+          }}
+        />
+      )}
       <Sidebar displayName={displayName} userId={user?.id} onLogout={handleLogout} />
 
       <main className="lg:ml-60">
@@ -293,11 +311,30 @@ export default function CreatorDashboard() {
                       </div>
                     </div>
                     {app.status === 'accepted' && (
-                      <Link href={`/chat/${app.id}`}>
-                        <Button size="sm" variant="secondary" className="flex-shrink-0 text-xs">
-                          Chat
-                        </Button>
-                      </Link>
+                      <div className="flex gap-1.5 flex-shrink-0">
+                        <Link href={`/chat/${app.id}`}>
+                          <Button size="sm" variant="secondary" className="text-xs">Chat</Button>
+                        </Link>
+                        {(!app.collab_status || app.collab_status === 'active') && (
+                          <Button
+                            size="sm"
+                            className="text-xs bg-emerald-600 hover:bg-emerald-700"
+                            onClick={() => setDeliveryApp(app)}
+                          >
+                            <Upload size={12} /> Entregar
+                          </Button>
+                        )}
+                        {app.collab_status === 'pending_brand_review' && (
+                          <span className="flex items-center gap-1 text-xs text-amber-600 font-medium bg-amber-50 px-2 py-1 rounded-xl">
+                            <Clock size={11} /> Esperando marca
+                          </span>
+                        )}
+                        {app.collab_status === 'completed' && (
+                          <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium bg-emerald-50 px-2 py-1 rounded-xl">
+                            <CheckCircle size={11} /> Completada
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
                 ))}

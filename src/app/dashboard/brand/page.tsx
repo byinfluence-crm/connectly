@@ -10,8 +10,9 @@ import {
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import { useAuth } from '@/components/AuthProvider';
-import { supabase, getApplicationsByBrand, updateApplicationStatus } from '@/lib/supabase';
-import type { ApplicationWithCreator } from '@/lib/supabase';
+import { supabase, getApplicationsByBrand, updateApplicationStatus, getDelivery } from '@/lib/supabase';
+import type { ApplicationWithCreator, CollabDelivery } from '@/lib/supabase';
+import BrandReviewModal from '@/components/BrandReviewModal';
 
 /* ─── MOCK DATA ─────────────────────────────────────────────────── */
 const MOCK_COLLABS = [
@@ -144,6 +145,10 @@ export default function BrandDashboard() {
   const router = useRouter();
   const [applications, setApplications] = useState<ApplicationWithCreator[]>([]);
   const [loadingApps, setLoadingApps] = useState(true);
+  const [reviewState, setReviewState] = useState<{
+    app: ApplicationWithCreator;
+    delivery: CollabDelivery;
+  } | null>(null);
 
   const displayName = (user?.user_metadata?.display_name as string) ?? 'Mi Marca';
   const credits = 20; // mock — useCredits cuando haya plan Stripe
@@ -162,6 +167,13 @@ export default function BrandDashboard() {
       .finally(() => setLoadingApps(false));
   }, [user?.id]);
 
+  const handleOpenReview = async (app: ApplicationWithCreator) => {
+    try {
+      const delivery = await getDelivery(app.id);
+      if (delivery) setReviewState({ app, delivery });
+    } catch (e) { console.error(e); }
+  };
+
   const handleStatusChange = async (appId: string, status: 'accepted' | 'rejected') => {
     if (!user?.id) return;
     try {
@@ -178,9 +190,29 @@ export default function BrandDashboard() {
   const showMockCandidates = !loadingApps && applications.length === 0;
   const pending = applications.filter(a => a.status === 'pending').length +
     (showMockCandidates ? MOCK_CANDIDATES.filter(c => c.status === 'pending').length : 0);
+  const pendingReviews = applications.filter(
+    a => a.status === 'accepted' && a.collab_status === 'pending_brand_review'
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {reviewState && user && (
+        <BrandReviewModal
+          applicationId={reviewState.app.id}
+          brandId={user.id}
+          influencerId={reviewState.app.creator_id}
+          creatorName={(reviewState.app.creator as { display_name: string } | null)?.display_name ?? 'Creador'}
+          collabTitle={reviewState.app.collab?.title ?? ''}
+          delivery={reviewState.delivery}
+          onClose={() => setReviewState(null)}
+          onDone={() => {
+            setReviewState(null);
+            setApplications(prev =>
+              prev.map(a => a.id === reviewState.app.id ? { ...a, collab_status: 'completed' } : a)
+            );
+          }}
+        />
+      )}
       <Sidebar displayName={displayName} onLogout={handleLogout} />
 
       {/* Main content — offset for sidebar on desktop */}
@@ -212,6 +244,29 @@ export default function BrandDashboard() {
               <Plus size={15} /> Nueva colaboración
             </Button>
           </div>
+
+          {/* ── Banner reseñas pendientes ── */}
+          {pendingReviews.length > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0 text-xl">
+                ⭐
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-bold text-amber-900">
+                  Tienes {pendingReviews.length} reseña{pendingReviews.length > 1 ? 's' : ''} pendiente{pendingReviews.length > 1 ? 's' : ''}
+                </div>
+                <div className="text-xs text-amber-700 mt-0.5">
+                  El creador ya entregó resultados. Deja tu valoración para ver las estadísticas completas.
+                </div>
+              </div>
+              <button
+                onClick={() => pendingReviews[0] && handleOpenReview(pendingReviews[0])}
+                className="flex-shrink-0 text-xs font-bold text-amber-800 bg-amber-200 hover:bg-amber-300 px-3 py-2 rounded-xl transition-colors"
+              >
+                Valorar →
+              </button>
+            </div>
+          )}
 
           {/* ── Stats ── */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -373,11 +428,24 @@ export default function BrandDashboard() {
                             </button>
                           </Link>
                         )}
-                        <Link href={`/chat/${app.id}`} className="flex-1">
-                          <button className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-violet-50 text-violet-700 text-xs font-semibold hover:bg-violet-100 transition-colors">
-                            <MessageCircle size={14} /> Abrir chat
+                        {app.collab_status === 'pending_brand_review' ? (
+                          <button
+                            onClick={() => handleOpenReview(app)}
+                            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-amber-50 text-amber-700 text-xs font-semibold hover:bg-amber-100 transition-colors border border-amber-200"
+                          >
+                            <Star size={13} /> Ver resultados y valorar
                           </button>
-                        </Link>
+                        ) : app.collab_status === 'completed' ? (
+                          <span className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-semibold">
+                            <CheckCircle size={13} /> Completada
+                          </span>
+                        ) : (
+                          <Link href={`/chat/${app.id}`} className="flex-1">
+                            <button className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-violet-50 text-violet-700 text-xs font-semibold hover:bg-violet-100 transition-colors">
+                              <MessageCircle size={14} /> Abrir chat
+                            </button>
+                          </Link>
+                        )}
                       </div>
                     )}
                   </div>

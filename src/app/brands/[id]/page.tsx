@@ -9,8 +9,8 @@ import {
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import { useAuth } from '@/components/AuthProvider';
-import { getPublicProfile, getBrandActiveCollabs } from '@/lib/supabase';
-import type { PublicProfile } from '@/lib/supabase';
+import { getPublicProfile, getBrandActiveCollabs, getReviewsForBrand } from '@/lib/supabase';
+import type { PublicProfile, Review } from '@/lib/supabase';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -68,18 +68,20 @@ export default function BrandProfilePage() {
 
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [collabs, setCollabs] = useState<Collab[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!id) return;
-    Promise.all([getPublicProfile(id), getBrandActiveCollabs(id)])
-      .then(([p, c]) => {
+    Promise.all([getPublicProfile(id), getBrandActiveCollabs(id), getReviewsForBrand(id)])
+      .then(([p, c, revs]) => {
         if (!p || p.user_type !== 'brand') {
           router.replace('/discover');
           return;
         }
         setProfile(p);
         setCollabs(c);
+        setReviews(revs);
       })
       .catch(() => router.replace('/discover'))
       .finally(() => setLoading(false));
@@ -98,7 +100,10 @@ export default function BrandProfilePage() {
   const isOwn = user?.id === id;
   const isGuest = !user;
   const isCreator = user?.user_metadata?.user_type === 'influencer';
-  const avgRating = 4.8;
+  const realReviews = reviews.length > 0 ? reviews : MOCK_REVIEWS;
+  const avgRating = reviews.length > 0
+    ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
+    : '4.8';
   const coverSeed = `brand-cover-${profile.id.slice(0, 6)}`;
   const logoSeed = `brand-logo-${profile.id.slice(0, 6)}`;
 
@@ -210,8 +215,8 @@ export default function BrandProfilePage() {
         <div className="mt-6 bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex items-center gap-4">
           <div className="text-3xl font-bold text-gray-900">{avgRating}</div>
           <div>
-            <Stars rating={5} />
-            <div className="text-xs text-gray-400 mt-0.5">{MOCK_REVIEWS.length} reseñas de creadores</div>
+            <Stars rating={Math.round(Number(avgRating))} />
+            <div className="text-xs text-gray-400 mt-0.5">{realReviews.length} reseñas de creadores</div>
           </div>
           <div className="ml-auto flex gap-2 text-center">
             <div>
@@ -289,21 +294,45 @@ export default function BrandProfilePage() {
         {/* ── Reviews ── */}
         <section className="mt-8">
           <h2 className="text-sm font-bold text-gray-900 mb-3">Reseñas de creadores</h2>
-          <div className="space-y-3">
-            {MOCK_REVIEWS.map(r => (
-              <div key={r.id} className="bg-white border border-gray-100 shadow-sm rounded-2xl p-4">
-                <div className="flex items-center gap-3 mb-2">
-                  <img src={r.img} alt={r.creator} className="w-8 h-8 rounded-full object-cover" />
-                  <div>
-                    <div className="text-xs font-bold text-gray-900">{r.creator}</div>
-                    <Stars rating={r.rating} />
+          {realReviews.length === 0 ? (
+            <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-6 text-center">
+              <p className="text-xs text-gray-400">Aún no hay reseñas. Se publicarán tras las primeras colaboraciones.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {realReviews.map((r, i) => {
+                const isReal = reviews.length > 0;
+                const name = isReal
+                  ? (r as Review & { reviewer?: { display_name: string } | null }).reviewer?.display_name ?? 'Creador'
+                  : (r as typeof MOCK_REVIEWS[0]).creator;
+                const img = isReal ? `https://picsum.photos/seed/rev-${String(r.id).slice(0, 6)}/40/40` : (r as typeof MOCK_REVIEWS[0]).img;
+                const text = isReal ? (r as Review).comment ?? '' : (r as typeof MOCK_REVIEWS[0]).text;
+                const date = isReal
+                  ? new Date((r as Review).created_at).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
+                  : (r as typeof MOCK_REVIEWS[0]).date;
+                return (
+                  <div key={r.id ?? i} className="bg-white border border-gray-100 shadow-sm rounded-2xl p-4">
+                    <div className="flex items-center gap-3 mb-2">
+                      <img src={img} alt={name} className="w-8 h-8 rounded-full object-cover" />
+                      <div>
+                        <div className="text-xs font-bold text-gray-900">{name}</div>
+                        <Stars rating={r.rating} />
+                      </div>
+                      <span className="ml-auto text-xs text-gray-400">{date}</span>
+                    </div>
+                    {text && <p className="text-xs text-gray-600 leading-relaxed">{text}</p>}
+                    {isReal && (r as Review).would_repeat !== null && (
+                      <span className={`inline-flex items-center gap-1 mt-2 text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                        (r as Review).would_repeat ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'
+                      }`}>
+                        {(r as Review).would_repeat ? '👍 Repetiría' : '👎 No repetiría'}
+                      </span>
+                    )}
                   </div>
-                  <span className="ml-auto text-xs text-gray-400">{r.date}</span>
-                </div>
-                <p className="text-xs text-gray-600 leading-relaxed">{r.text}</p>
-              </div>
-            ))}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </section>
 
         {/* ── CTA bottom (creator or guest) ── */}
