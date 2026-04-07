@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Send, ShieldAlert, Lock } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
-import { useChat, containsPhone } from '@/lib/hooks/useChat';
+import { useChat, containsBlockedContent } from '@/lib/hooks/useChat';
 import { getApplicationById } from '@/lib/supabase';
 
 type AppInfo = Awaited<ReturnType<typeof getApplicationById>>;
@@ -66,11 +66,11 @@ export default function ChatPage() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Detectar teléfono en tiempo real mientras escribe
+  // Detectar contenido bloqueado en tiempo real mientras escribe
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     setInput(val);
-    setPhoneWarning(containsPhone(val));
+    setPhoneWarning(containsBlockedContent(val));
     if (blocked) setBlocked(false);
   };
 
@@ -155,13 +155,12 @@ export default function ChatPage() {
         </div>
       </div>
 
-      {/* ── Aviso de política ── */}
+      {/* ── Aviso de política (siempre visible) ── */}
       <div className="bg-amber-50 border-b border-amber-100 flex-shrink-0">
         <div className="max-w-2xl mx-auto px-4 py-2 flex items-start gap-2 text-xs text-amber-700">
-          <ShieldAlert size={14} className="flex-shrink-0 mt-0.5" />
+          <ShieldAlert size={13} className="flex-shrink-0 mt-0.5" />
           <span>
-            Por seguridad, <strong>no compartas teléfonos ni emails</strong> en el chat.
-            Toda la comunicación queda dentro de Connectly.
+            Toda comunicación debe ocurrir dentro de Connectly. No compartas datos de contacto.
           </span>
         </div>
       </div>
@@ -236,16 +235,16 @@ export default function ChatPage() {
       <div className="bg-white border-t border-gray-100 flex-shrink-0">
         <div className="max-w-2xl mx-auto px-4 py-3">
 
-          {/* Warning teléfono */}
+          {/* ── Banner de bloqueo ── */}
           {(phoneWarning || blocked) && (
-            <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl px-3 py-2 mb-2.5 text-xs text-red-700">
-              <ShieldAlert size={14} className="flex-shrink-0 mt-0.5" />
-              <span>
-                {blocked
-                  ? 'Mensaje bloqueado — no está permitido compartir números de teléfono. Coordina la llamada desde la sección de videollamadas (próximamente).'
-                  : 'Parece que el mensaje contiene un número de teléfono. No se podrá enviar.'
-                }
-              </span>
+            <div className="flex items-start gap-2.5 bg-red-50 border border-red-200 rounded-2xl px-4 py-3 mb-3">
+              <ShieldAlert size={16} className="text-red-600 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-red-700 leading-relaxed">
+                <strong className="font-semibold">
+                  No está permitido compartir datos de contacto (teléfonos, emails, redes sociales) en el chat.
+                </strong>{' '}
+                Connectly no se hace responsable de acuerdos, pagos o comunicaciones realizadas fuera de la plataforma.
+              </p>
             </div>
           )}
 
