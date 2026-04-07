@@ -120,7 +120,7 @@ export default function HomePage() {
             {FEATURED_INFLUENCERS.map((inf) => (
               <Link
                 key={inf.handle}
-                href={`/profile/${inf.handle.replace('@', '')}`}
+                href="/discover"
                 className="group bg-white rounded-2xl border border-gray-100 p-5 hover:border-violet-200 hover:shadow-lg transition-all duration-200"
               >
                 <div className="flex items-start justify-between mb-3">
@@ -302,6 +302,7 @@ export default function HomePage() {
             <span className="font-bold text-gray-900">Connectly</span>
           </div>
           <div className="flex items-center gap-6 text-xs text-gray-400">
+            <Link href="/blog" className="hover:text-gray-600">Blog</Link>
             <Link href="/privacy" className="hover:text-gray-600">Privacidad</Link>
             <Link href="/terms" className="hover:text-gray-600">Términos</Link>
             <Link href="/contact" className="hover:text-gray-600">Contacto</Link>

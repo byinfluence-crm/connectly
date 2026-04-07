@@ -106,7 +106,7 @@ export default function ChatPage() {
 
   if (!appInfo) return null;
 
-  const isCreator = user?.id === appInfo.creator_id;
+  const isCreator = user?.id === appInfo.influencer_profile_id;
   const otherName = isCreator
     ? (appInfo.brand as { display_name: string } | null)?.display_name ?? 'Marca'
     : (appInfo.creator as { display_name: string } | null)?.display_name ?? 'Creador';

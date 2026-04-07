@@ -54,6 +54,9 @@ export default function Navbar() {
           <Link href="/about" className="text-sm text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors">
             Cómo funciona
           </Link>
+          <Link href="/blog" className="text-sm text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+            Blog
+          </Link>
         </nav>
 
         {/* Desktop: auth state */}
@@ -143,6 +146,9 @@ export default function Navbar() {
           </Link>
           <Link href="/about" className="text-sm text-gray-700 px-3 py-2.5 rounded-lg hover:bg-gray-50" onClick={() => setOpen(false)}>
             Cómo funciona
+          </Link>
+          <Link href="/blog" className="text-sm text-gray-700 px-3 py-2.5 rounded-lg hover:bg-gray-50" onClick={() => setOpen(false)}>
+            Blog
           </Link>
 
           {user ? (

@@ -107,10 +107,13 @@ export default function CreatorAnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [activeChart, setActiveChart] = useState<'alcance' | 'interacciones' | 'er'>('alcance');
   const [filterMonth, setFilterMonth] = useState('');
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
-    if (!authLoading && !user) router.replace('/login');
-  }, [user, authLoading, router]);
+    if (mounted && !authLoading && !user) router.replace('/login');
+  }, [mounted, user, authLoading, router]);
 
   useEffect(() => {
     if (!user?.id) return;

@@ -201,7 +201,7 @@ export default function BrandDashboard() {
         <BrandReviewModal
           applicationId={reviewState.app.id}
           brandId={user.id}
-          influencerId={reviewState.app.creator_id}
+          influencerId={reviewState.app.influencer_profile_id}
           creatorName={(reviewState.app.creator as { display_name: string } | null)?.display_name ?? 'Creador'}
           collabTitle={reviewState.app.collab?.title ?? ''}
           delivery={reviewState.delivery}
@@ -399,8 +399,8 @@ export default function BrandDashboard() {
 
                     {app.status === 'pending' && (
                       <div className="flex gap-2 mt-3 pt-3 border-t border-gray-50">
-                        {app.creator_id && (
-                          <Link href={`/creators/${app.creator_id}`} className="flex-shrink-0">
+                        {app.influencer_profile_id && (
+                          <Link href={`/creators/${app.influencer_profile_id}`} className="flex-shrink-0">
                             <button className="flex items-center justify-center gap-1 px-3 py-2 rounded-xl bg-gray-50 text-gray-600 text-xs font-semibold hover:bg-gray-100 transition-colors">
                               <Star size={13} /> Ver perfil
                             </button>
@@ -422,8 +422,8 @@ export default function BrandDashboard() {
                     )}
                     {app.status === 'accepted' && (
                       <div className="flex gap-2 mt-3 pt-3 border-t border-gray-50">
-                        {app.creator_id && (
-                          <Link href={`/creators/${app.creator_id}`} className="flex-shrink-0">
+                        {app.influencer_profile_id && (
+                          <Link href={`/creators/${app.influencer_profile_id}`} className="flex-shrink-0">
                             <button className="flex items-center justify-center gap-1 px-3 py-2 rounded-xl bg-gray-50 text-gray-600 text-xs font-semibold hover:bg-gray-100 transition-colors">
                               <Star size={13} /> Ver perfil
                             </button>

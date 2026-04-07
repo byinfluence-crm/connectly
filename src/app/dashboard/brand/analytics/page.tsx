@@ -75,10 +75,13 @@ export default function BrandAnalyticsPage() {
   const [data, setData] = useState<BrandData>([]);
   const [loading, setLoading] = useState(true);
   const [activeChart, setActiveChart] = useState<'alcance' | 'interacciones'>('alcance');
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
-    if (!authLoading && !user) router.replace('/login');
-  }, [user, authLoading, router]);
+    if (mounted && !authLoading && !user) router.replace('/login');
+  }, [mounted, user, authLoading, router]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -119,11 +122,11 @@ export default function BrandAnalyticsPage() {
     if (completed.length === 0) return MOCK_TOP_INFLUENCERS;
     const map = new Map<string, { name: string; niche: string | null; collabs: number; reach: number; interactions: number; id: string }>();
     for (const d of completed) {
-      const key = d.creator_id;
+      const key = d.influencer_profile_id;
       const ex = map.get(key) ?? {
         name: d.creator?.display_name ?? 'Creador',
         niche: d.creator?.niche ?? null,
-        collabs: 0, reach: 0, interactions: 0, id: d.creator_id,
+        collabs: 0, reach: 0, interactions: 0, id: d.influencer_profile_id,
       };
       ex.collabs++;
       ex.reach += d.delivery?.reach ?? 0;

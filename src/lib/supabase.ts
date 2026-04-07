@@ -118,8 +118,8 @@ export type ApplicationStatus = 'pending' | 'accepted' | 'rejected';
 
 export interface CollabApplication {
   id: string;
-  collab_id: string;
-  creator_id: string;
+  collaboration_id: string;
+  influencer_profile_id: string;
   brand_id: string;
   status: ApplicationStatus;
   message: string | null;
@@ -153,12 +153,29 @@ export interface ApplicationWithCreator extends CollabApplication {
   } | null;
 }
 
+/**
+ * Resuelve el influencer_profile_id desde el marketplace_users.id (auth uid).
+ * influencer_profiles puede tener user_id = marketplace_users.id.
+ * Si no hay perfil vinculado, devuelve el userId como fallback.
+ */
+async function resolveInfluencerProfileId(userId: string): Promise<string> {
+  const { data } = await supabase
+    .from('influencer_profiles')
+    .select('id')
+    .eq('user_id', userId)
+    .maybeSingle();
+  return data?.id ?? userId;
+}
+
 /** Aplica a una colaboración. Devuelve error_code si falla. */
 export async function applyToCollab(
   creatorId: string,
   collabId: string,
   message?: string,
 ): Promise<{ success: boolean; error_code?: string }> {
+  // Resolver el influencer_profile_id real (puede diferir del auth user id)
+  const influencerProfileId = await resolveInfluencerProfileId(creatorId);
+
   // Leer brand_id de la colaboración
   const { data: collab, error: collabErr } = await supabase
     .from('collabs')
@@ -171,8 +188,8 @@ export async function applyToCollab(
   }
 
   const { error } = await supabase.from('collab_applications').insert({
-    collab_id: collabId,
-    creator_id: creatorId,
+    collaboration_id: collabId,
+    influencer_profile_id: influencerProfileId,
     brand_id: collab.brand_id,
     message: message?.trim() || null,
     status: 'pending',
@@ -190,8 +207,8 @@ export async function hasApplied(creatorId: string, collabId: string): Promise<b
   const { data } = await supabase
     .from('collab_applications')
     .select('id')
-    .eq('creator_id', creatorId)
-    .eq('collab_id', collabId)
+    .eq('influencer_profile_id', creatorId)
+    .eq('collaboration_id', collabId)
     .maybeSingle();
   return !!data;
 }
@@ -201,13 +218,13 @@ export async function getApplicationsByCreator(creatorId: string): Promise<Appli
   const { data, error } = await supabase
     .from('collab_applications')
     .select(`
-      id, collab_id, creator_id, brand_id, status, collab_status, message, created_at,
-      collab:collabs!collab_id (
+      id, collaboration_id, influencer_profile_id, brand_id, status, collab_status, message, created_at,
+      collab:collabs!collaboration_id (
         id, title, type, budget,
         brand:marketplace_users!brand_id ( display_name )
       )
     `)
-    .eq('creator_id', creatorId)
+    .eq('influencer_profile_id', creatorId)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
@@ -219,9 +236,9 @@ export async function getApplicationsByBrand(brandId: string): Promise<Applicati
   const { data, error } = await supabase
     .from('collab_applications')
     .select(`
-      id, collab_id, creator_id, brand_id, status, collab_status, message, created_at,
-      creator:marketplace_users!creator_id ( id, display_name, city, niche ),
-      collab:collabs!collab_id ( id, title, type, budget )
+      id, collaboration_id, influencer_profile_id, brand_id, status, collab_status, message, created_at,
+      creator:marketplace_users!influencer_profile_id ( id, display_name, city, niche ),
+      collab:collabs!collaboration_id ( id, title, type, budget )
     `)
     .eq('brand_id', brandId)
     .order('created_at', { ascending: false });
@@ -248,7 +265,7 @@ export async function updateApplicationStatus(
 export async function getApplicationById(appId: string): Promise<{
   id: string;
   status: string;
-  creator_id: string;
+  influencer_profile_id: string;
   brand_id: string;
   creator: { display_name: string } | null;
   brand: { display_name: string } | null;
@@ -257,10 +274,10 @@ export async function getApplicationById(appId: string): Promise<{
   const { data } = await supabase
     .from('collab_applications')
     .select(`
-      id, status, creator_id, brand_id,
-      creator:marketplace_users!creator_id ( display_name ),
+      id, status, influencer_profile_id, brand_id,
+      creator:marketplace_users!influencer_profile_id ( display_name ),
       brand:marketplace_users!brand_id ( display_name ),
-      collab:collabs!collab_id ( title )
+      collab:collabs!collaboration_id ( title )
     `)
     .eq('id', appId)
     .single();
@@ -581,7 +598,7 @@ export async function getInfluencerDeliveries(influencerId: string) {
       reach, impressions, interactions, video_views,
       stories_count, story_views_avg, link_clicks,
       application:collab_applications!application_id (
-        collab:collabs!collab_id ( title, type ),
+        collab:collabs!collaboration_id ( title, type ),
         brand:marketplace_users!brand_id ( display_name )
       )
     `)
@@ -611,8 +628,8 @@ export async function getBrandAnalytics(brandId: string) {
   const { data } = await supabase
     .from('collab_applications')
     .select(`
-      id, creator_id, collab_status, created_at,
-      creator:marketplace_users!creator_id ( display_name, niche ),
+      id, influencer_profile_id, collab_status, created_at,
+      creator:marketplace_users!influencer_profile_id ( display_name, niche ),
       delivery:collaboration_deliveries!application_id (
         reach, impressions, interactions, video_views,
         submitted_at
@@ -622,7 +639,7 @@ export async function getBrandAnalytics(brandId: string) {
     .eq('status', 'accepted');
   return (data ?? []) as unknown as {
     id: string;
-    creator_id: string;
+    influencer_profile_id: string;
     collab_status: string | null;
     created_at: string;
     creator: { display_name: string; niche: string | null } | null;
