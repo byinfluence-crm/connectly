@@ -1,17 +1,17 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Plus, Search, Zap, Users, TrendingUp, Clock, CheckCircle,
-  XCircle, ChevronRight, Star, MapPin, LogOut, Flame, Eye,
-  FileText, MoreHorizontal,
+  XCircle, ChevronRight, MapPin, LogOut, Flame, Eye,
+  FileText, MoreHorizontal, Star,
 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
-import Avatar from '@/components/ui/Avatar';
 import { useAuth } from '@/components/AuthProvider';
-import { supabase } from '@/lib/supabase';
+import { supabase, getApplicationsByBrand, updateApplicationStatus } from '@/lib/supabase';
+import type { ApplicationWithCreator } from '@/lib/supabase';
 
 /* ─── MOCK DATA ─────────────────────────────────────────────────── */
 const MOCK_COLLABS = [
@@ -142,19 +142,42 @@ function NavItem({
 export default function BrandDashboard() {
   const { user } = useAuth();
   const router = useRouter();
-  const [candidateStatus, setCandidateStatus] = useState<Record<number, 'accepted' | 'rejected' | 'pending'>>(
-    Object.fromEntries(MOCK_CANDIDATES.map(c => [c.id, c.status]))
-  );
+  const [applications, setApplications] = useState<ApplicationWithCreator[]>([]);
+  const [loadingApps, setLoadingApps] = useState(true);
 
   const displayName = (user?.user_metadata?.display_name as string) ?? 'Mi Marca';
-  const credits = 20; // mock — vendrá de useCredits cuando haya auth real
+  const credits = 20; // mock — useCredits cuando haya plan Stripe
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push('/');
   };
 
-  const pending = MOCK_CANDIDATES.filter(c => candidateStatus[c.id] === 'pending').length;
+  // Cargar candidatos reales desde Supabase
+  useEffect(() => {
+    if (!user?.id) return;
+    getApplicationsByBrand(user.id)
+      .then(setApplications)
+      .catch(console.error)
+      .finally(() => setLoadingApps(false));
+  }, [user?.id]);
+
+  const handleStatusChange = async (appId: string, status: 'accepted' | 'rejected') => {
+    if (!user?.id) return;
+    try {
+      await updateApplicationStatus(appId, status, user.id);
+      setApplications(prev =>
+        prev.map(a => a.id === appId ? { ...a, status } : a)
+      );
+    } catch (err) {
+      console.error('Error updating status:', err);
+    }
+  };
+
+  // Usar datos reales si hay, si no mock para demo visual
+  const showMockCandidates = !loadingApps && applications.length === 0;
+  const pending = applications.filter(a => a.status === 'pending').length +
+    (showMockCandidates ? MOCK_CANDIDATES.filter(c => c.status === 'pending').length : 0);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -272,64 +295,84 @@ export default function BrandDashboard() {
               </h2>
             </div>
 
-            <div className="space-y-3">
-              {MOCK_CANDIDATES.map(c => {
-                const status = candidateStatus[c.id];
-                return (
+            {loadingApps ? (
+              <div className="space-y-3">
+                {[1, 2].map(i => (
+                  <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4 animate-pulse h-20" />
+                ))}
+              </div>
+            ) : applications.length > 0 ? (
+              /* ── Candidatos reales de Supabase ── */
+              <div className="space-y-3">
+                {applications.map(app => (
                   <div
-                    key={c.id}
+                    key={app.id}
                     className={`bg-white rounded-2xl border shadow-sm p-4 transition-all ${
-                      status === 'pending' ? 'border-amber-100' : 'border-gray-100'
+                      app.status === 'pending' ? 'border-amber-100' : 'border-gray-100'
                     }`}
                   >
                     <div className="flex items-start gap-3">
-                      <img src={c.img} alt={c.name} className="w-11 h-11 rounded-full object-cover flex-shrink-0" />
+                      <div className="w-11 h-11 rounded-full bg-gradient-to-br from-violet-400 to-violet-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                        {app.creator?.display_name?.charAt(0).toUpperCase() ?? '?'}
+                      </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                          <span className="text-sm font-semibold text-gray-900">{c.name}</span>
-                          <span className="text-xs text-gray-400">{c.handle}</span>
-                          <Badge variant={CAND_STATUS[status].variant} size="sm">
-                            {CAND_STATUS[status].label}
+                          <span className="text-sm font-semibold text-gray-900">
+                            {app.creator?.display_name ?? 'Creador'}
+                          </span>
+                          <Badge variant={CAND_STATUS[app.status].variant} size="sm">
+                            {CAND_STATUS[app.status].label}
                           </Badge>
                         </div>
-                        <div className="flex items-center gap-3 text-xs text-gray-400 mb-1.5">
-                          <span>{formatK(c.followers)} seguidores</span>
-                          <span className="text-emerald-600 font-medium">{c.er}% ER</span>
-                          <span className="flex items-center gap-0.5"><MapPin size={10} />{c.city}</span>
-                          <span className="flex items-center gap-0.5"><Star size={10} className="text-amber-400 fill-amber-400" />{c.rating}</span>
+                        <div className="flex items-center gap-3 text-xs text-gray-400 mb-1">
+                          {app.creator?.city && (
+                            <span className="flex items-center gap-0.5"><MapPin size={10} />{app.creator.city}</span>
+                          )}
+                          {app.creator?.niche && <span>{app.creator.niche}</span>}
                         </div>
                         <div className="text-xs text-gray-400">
-                          Para: <span className="text-gray-600 font-medium">{c.collab}</span> · {c.appliedAt}
+                          Para: <span className="text-gray-600 font-medium">{app.collab?.title ?? '—'}</span>
                         </div>
+                        {app.message && (
+                          <div className="mt-1.5 text-xs text-gray-500 italic bg-gray-50 rounded-lg px-2.5 py-1.5">
+                            "{app.message}"
+                          </div>
+                        )}
                       </div>
                     </div>
 
-                    {status === 'pending' && (
+                    {app.status === 'pending' && (
                       <div className="flex gap-2 mt-3 pt-3 border-t border-gray-50">
                         <button
-                          onClick={() => setCandidateStatus(prev => ({ ...prev, [c.id]: 'accepted' }))}
+                          onClick={() => handleStatusChange(app.id, 'accepted')}
                           className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 transition-colors"
                         >
                           <CheckCircle size={14} /> Aceptar
                         </button>
                         <button
-                          onClick={() => setCandidateStatus(prev => ({ ...prev, [c.id]: 'rejected' }))}
+                          onClick={() => handleStatusChange(app.id, 'rejected')}
                           className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-red-50 text-red-600 text-xs font-semibold hover:bg-red-100 transition-colors"
                         >
                           <XCircle size={14} /> Rechazar
                         </button>
-                        <Link
-                          href="/discover"
-                          className="px-3 flex items-center justify-center rounded-xl bg-gray-50 text-gray-600 text-xs font-semibold hover:bg-gray-100 transition-colors"
-                        >
-                          Ver perfil
-                        </Link>
                       </div>
                     )}
                   </div>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            ) : (
+              /* ── Estado vacío ── */
+              <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-8 text-center">
+                <div className="text-2xl mb-2">📭</div>
+                <div className="text-sm font-semibold text-gray-700 mb-1">Aún no tienes candidatos</div>
+                <div className="text-xs text-gray-400 mb-4">
+                  Publica una colaboración y los creadores empezarán a aplicar
+                </div>
+                <Button size="sm" variant="secondary" onClick={() => router.push('/discover')}>
+                  Descubrir creadores
+                </Button>
+              </div>
+            )}
           </section>
 
           {/* ── Quick access discover ── */}

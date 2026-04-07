@@ -1,14 +1,16 @@
 'use client';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  Search, Zap, TrendingUp, Clock, CheckCircle, ChevronRight,
+  Search, TrendingUp, Clock, CheckCircle, ChevronRight,
   MapPin, Flame, LogOut, FileText, User, Send,
 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import { useAuth } from '@/components/AuthProvider';
-import { supabase } from '@/lib/supabase';
+import { supabase, getApplicationsByCreator } from '@/lib/supabase';
+import type { ApplicationWithCollab } from '@/lib/supabase';
 
 /* ─── MOCK DATA ─────────────────────────────────────────────────── */
 const MOCK_APPLICATIONS = [
@@ -122,6 +124,8 @@ function NavItem({
 export default function CreatorDashboard() {
   const { user } = useAuth();
   const router = useRouter();
+  const [applications, setApplications] = useState<ApplicationWithCollab[]>([]);
+  const [loadingApps, setLoadingApps] = useState(true);
 
   const displayName = (user?.user_metadata?.display_name as string) ?? 'Creador';
 
@@ -130,9 +134,18 @@ export default function CreatorDashboard() {
     router.push('/');
   };
 
-  const totalSent = MOCK_APPLICATIONS.length;
-  const accepted = MOCK_APPLICATIONS.filter(a => a.status === 'accepted').length;
-  const pending = MOCK_APPLICATIONS.filter(a => a.status === 'pending').length;
+  // Cargar aplicaciones reales desde Supabase
+  useEffect(() => {
+    if (!user?.id) return;
+    getApplicationsByCreator(user.id)
+      .then(setApplications)
+      .catch(console.error)
+      .finally(() => setLoadingApps(false));
+  }, [user?.id]);
+
+  const totalSent = applications.length;
+  const accepted = applications.filter(a => a.status === 'accepted').length;
+  const pending = applications.filter(a => a.status === 'pending').length;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -246,38 +259,59 @@ export default function CreatorDashboard() {
           {/* ── Mis aplicaciones ── */}
           <section>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-bold text-gray-900">Mis aplicaciones recientes</h2>
+              <h2 className="text-base font-bold text-gray-900">Mis aplicaciones</h2>
             </div>
 
-            <div className="space-y-3">
-              {MOCK_APPLICATIONS.map(app => (
-                <div
-                  key={app.id}
-                  className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-4"
-                >
-                  <img src={app.logo} alt={app.brand} className="w-10 h-10 rounded-xl object-cover flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                      <span className="text-sm font-semibold text-gray-900">{app.brand}</span>
-                      <Badge variant={APP_STATUS[app.status].variant} size="sm">
-                        {APP_STATUS[app.status].label}
-                      </Badge>
+            {loadingApps ? (
+              <div className="space-y-3">
+                {[1, 2].map(i => (
+                  <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4 animate-pulse h-16" />
+                ))}
+              </div>
+            ) : applications.length > 0 ? (
+              <div className="space-y-3">
+                {applications.map(app => (
+                  <div
+                    key={app.id}
+                    className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-4"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-400 to-violet-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                      {app.collab?.brand?.display_name?.charAt(0).toUpperCase() ?? '?'}
                     </div>
-                    <div className="text-xs text-gray-500 truncate">{app.title}</div>
-                    <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
-                      <span>{app.type}{app.budget ? ` · ${app.budget}€` : ''}</span>
-                      <span>·</span>
-                      <span>{app.appliedAt}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                        <span className="text-sm font-semibold text-gray-900">
+                          {app.collab?.brand?.display_name ?? 'Marca'}
+                        </span>
+                        <Badge variant={APP_STATUS[app.status].variant} size="sm">
+                          {APP_STATUS[app.status].label}
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-gray-500 truncate">{app.collab?.title ?? '—'}</div>
+                      <div className="text-xs text-gray-400 mt-0.5">
+                        {app.collab?.type}{app.collab?.budget ? ` · ${app.collab.budget}€` : ''}
+                      </div>
                     </div>
+                    {app.status === 'accepted' && (
+                      <Button size="sm" variant="secondary" className="flex-shrink-0 text-xs">
+                        Contactar
+                      </Button>
+                    )}
                   </div>
-                  {app.status === 'accepted' && (
-                    <Button size="sm" variant="secondary" className="flex-shrink-0 text-xs">
-                      Contactar
-                    </Button>
-                  )}
+                ))}
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-8 text-center">
+                <div className="text-2xl mb-2">🚀</div>
+                <div className="text-sm font-semibold text-gray-700 mb-1">Aún no has aplicado a ninguna colaboración</div>
+                <div className="text-xs text-gray-400 mb-4">
+                  Encuentra oportunidades que encajan con tu nicho
                 </div>
-              ))}
-            </div>
+                <Button size="sm" variant="secondary" onClick={() => router.push('/discover')}>
+                  Ver colaboraciones
+                </Button>
+              </div>
+            )}
           </section>
 
           {/* ── Banner perfil público ── */}
