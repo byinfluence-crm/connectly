@@ -96,6 +96,7 @@ function Sidebar({ displayName, onLogout }: { displayName: string; onLogout: () 
         <NavItem href="/discover" icon={<Search size={16} />} label="Descubrir creadores" />
         <NavItem href="/dashboard/brand/collabs" icon={<FileText size={16} />} label="Mis colaboraciones" />
         <NavItem href="/dashboard/brand/candidates" icon={<Users size={16} />} label="Candidatos" badge={2} />
+        <NavItem href="/dashboard/brand/analytics" icon={<Zap size={16} />} label="Analytics" />
       </nav>
 
       {/* Bottom */}

@@ -78,6 +78,7 @@ function Sidebar({ displayName, userId, onLogout }: { displayName: string; userI
         <NavItem href="/dashboard/creator" icon={<TrendingUp size={16} />} label="Inicio" active />
         <NavItem href="/discover" icon={<Search size={16} />} label="Buscar colaboraciones" />
         <NavItem href="/dashboard/creator/applications" icon={<FileText size={16} />} label="Mis aplicaciones" badge={2} />
+        <NavItem href="/dashboard/creator/analytics" icon={<TrendingUp size={16} />} label="Mis analytics" />
         <NavItem href={userId ? `/creators/${userId}` : '/discover'} icon={<User size={16} />} label="Mi perfil público" />
       </nav>
 

@@ -524,3 +524,112 @@ export async function getNotifications(userId: string): Promise<AppNotification[
 export async function markNotificationRead(notificationId: string): Promise<void> {
   await supabase.from('notifications').update({ read: true }).eq('id', notificationId);
 }
+
+// ─── Analytics ────────────────────────────────────────────────────────────────
+
+export interface MonthlyStats {
+  year_month: string;
+  collabs_count: number;
+  reach_total: number;
+  impressions: number;
+  interactions: number;
+  video_views: number;
+  stories_count: number;
+  story_views: number;
+  link_clicks: number;
+  avg_er: number;
+}
+
+export interface InfluencerScore {
+  score: number;
+  engagement_factor: number | null;
+  rating_factor: number | null;
+  punctuality_factor: number | null;
+  completion_factor: number | null;
+  calculated_at: string;
+}
+
+/** Stats mensuales del influencer desde la vista de Supabase. */
+export async function getInfluencerMonthlyStats(influencerId: string): Promise<MonthlyStats[]> {
+  const { data } = await supabase
+    .from('v_influencer_delivery_stats')
+    .select('*')
+    .eq('influencer_id', influencerId)
+    .order('year_month', { ascending: false })
+    .limit(12);
+  return (data ?? []) as MonthlyStats[];
+}
+
+/** Último score calculado del influencer. */
+export async function getInfluencerScore(influencerId: string): Promise<InfluencerScore | null> {
+  const { data } = await supabase
+    .from('influencer_scores')
+    .select('*')
+    .eq('influencer_id', influencerId)
+    .order('calculated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data as InfluencerScore | null;
+}
+
+/** Historial de entregas del influencer con collab info. */
+export async function getInfluencerDeliveries(influencerId: string) {
+  const { data } = await supabase
+    .from('collaboration_deliveries')
+    .select(`
+      id, submitted_at, post_urls, content_types,
+      reach, impressions, interactions, video_views,
+      stories_count, story_views_avg, link_clicks,
+      application:collab_applications!application_id (
+        collab:collabs!collab_id ( title, type ),
+        brand:marketplace_users!brand_id ( display_name )
+      )
+    `)
+    .eq('influencer_id', influencerId)
+    .order('submitted_at', { ascending: false });
+  return (data ?? []) as unknown as {
+    id: string;
+    submitted_at: string;
+    post_urls: string[];
+    content_types: string[];
+    reach: number | null;
+    impressions: number | null;
+    interactions: number | null;
+    video_views: number | null;
+    stories_count: number | null;
+    story_views_avg: number | null;
+    link_clicks: number | null;
+    application: {
+      collab: { title: string; type: string } | null;
+      brand: { display_name: string } | null;
+    } | null;
+  }[];
+}
+
+/** Analytics agregados de la marca: alcance total, colaboraciones, top influencers. */
+export async function getBrandAnalytics(brandId: string) {
+  const { data } = await supabase
+    .from('collab_applications')
+    .select(`
+      id, creator_id, collab_status, created_at,
+      creator:marketplace_users!creator_id ( display_name, niche ),
+      delivery:collaboration_deliveries!application_id (
+        reach, impressions, interactions, video_views,
+        submitted_at
+      )
+    `)
+    .eq('brand_id', brandId)
+    .eq('status', 'accepted');
+  return (data ?? []) as unknown as {
+    id: string;
+    creator_id: string;
+    collab_status: string | null;
+    created_at: string;
+    creator: { display_name: string; niche: string | null } | null;
+    delivery: {
+      reach: number | null; impressions: number | null;
+      interactions: number | null; video_views: number | null;
+      submitted_at: string;
+    } | null;
+  }[];
+}
