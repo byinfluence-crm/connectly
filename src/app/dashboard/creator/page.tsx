@@ -61,7 +61,7 @@ const APP_STATUS = {
 };
 
 /* ─── SIDEBAR ───────────────────────────────────────────────────── */
-function Sidebar({ displayName, onLogout }: { displayName: string; onLogout: () => void }) {
+function Sidebar({ displayName, userId, onLogout }: { displayName: string; userId: string | undefined; onLogout: () => void }) {
   return (
     <aside className="hidden lg:flex flex-col w-60 bg-white border-r border-gray-100 min-h-screen fixed top-0 left-0">
       <div className="h-16 flex items-center px-6 border-b border-gray-100">
@@ -77,7 +77,7 @@ function Sidebar({ displayName, onLogout }: { displayName: string; onLogout: () 
         <NavItem href="/dashboard/creator" icon={<TrendingUp size={16} />} label="Inicio" active />
         <NavItem href="/discover" icon={<Search size={16} />} label="Buscar colaboraciones" />
         <NavItem href="/dashboard/creator/applications" icon={<FileText size={16} />} label="Mis aplicaciones" badge={2} />
-        <NavItem href="/dashboard/creator/profile" icon={<User size={16} />} label="Mi perfil público" />
+        <NavItem href={userId ? `/creators/${userId}` : '/discover'} icon={<User size={16} />} label="Mi perfil público" />
       </nav>
 
       <div className="px-4 py-4 border-t border-gray-100">
@@ -149,7 +149,7 @@ export default function CreatorDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Sidebar displayName={displayName} onLogout={handleLogout} />
+      <Sidebar displayName={displayName} userId={user?.id} onLogout={handleLogout} />
 
       <main className="lg:ml-60">
         {/* Mobile header */}
@@ -175,7 +175,7 @@ export default function CreatorDashboard() {
               </h1>
               <p className="text-sm text-gray-500 mt-0.5">Tienes {pending} aplicación{pending !== 1 ? 'es' : ''} en espera</p>
             </div>
-            <Link href="/dashboard/creator/profile">
+            <Link href={user ? `/creators/${user.id}` : '/discover'}>
               <Button size="sm" variant="outline">
                 <User size={15} /> Mi perfil
               </Button>
@@ -323,7 +323,7 @@ export default function CreatorDashboard() {
                 <div className="text-white font-bold mb-1">¿Cómo te ven las marcas?</div>
                 <div className="text-violet-200 text-sm">Revisa y completa tu perfil público para destacar</div>
               </div>
-              <Link href="/dashboard/creator/profile">
+              <Link href={user ? `/creators/${user.id}` : '/discover'}>
                 <Button variant="outline" size="sm" className="border-white/40 text-white hover:bg-white/10 flex-shrink-0">
                   Ver mi perfil <ChevronRight size={14} />
                 </Button>

@@ -75,6 +75,43 @@ export async function unlockProfile(userId: string, influencerProfileId: string)
   return data; // { success, credits_remaining, error_code? }
 }
 
+// ─── Perfiles públicos ───────────────────────────────────────────────────────
+
+export interface PublicProfile {
+  id: string;
+  user_type: 'brand' | 'influencer';
+  display_name: string;
+  city: string | null;
+  niche: string | null;
+  is_verified: boolean;
+  is_boosted: boolean;
+  created_at: string;
+}
+
+/** Perfil público de cualquier usuario (datos básicos de marketplace_users). */
+export async function getPublicProfile(userId: string): Promise<PublicProfile | null> {
+  const { data } = await supabase
+    .from('marketplace_users')
+    .select('id, user_type, display_name, city, niche, is_verified, is_boosted, created_at')
+    .eq('id', userId)
+    .single();
+  return data as PublicProfile | null;
+}
+
+/** Colaboraciones activas de una marca (para su perfil público). */
+export async function getBrandActiveCollabs(brandId: string) {
+  const { data } = await supabase
+    .from('collabs')
+    .select('id, title, type, budget, niche, city, deadline, is_boosted')
+    .eq('brand_id', brandId)
+    .eq('status', 'active')
+    .order('is_boosted', { ascending: false });
+  return (data ?? []) as {
+    id: string; title: string; type: string; budget: number | null;
+    niche: string; city: string; deadline: string; is_boosted: boolean;
+  }[];
+}
+
 // ─── Collab Applications ─────────────────────────────────────────────────────
 
 export type ApplicationStatus = 'pending' | 'accepted' | 'rejected';
