@@ -623,6 +623,97 @@ export async function getInfluencerDeliveries(influencerId: string) {
   }[];
 }
 
+// ─── UGC Projects ─────────────────────────────────────────────────────────────
+
+import type { UgcProject, UgcProjectStatus, UgcDelivery } from '@/types';
+
+export interface UgcProjectInput {
+  title: string;
+  description?: string;
+  content_types: string[];
+  deliverables_count: number;
+  budget_cents?: number;
+  deadline?: string;
+  usage_rights: 'brand_owned' | 'shared' | 'licensed';
+  revision_limit: number;
+  reference_urls?: string[];
+  notes?: string;
+}
+
+export async function createUgcProject(
+  brandId: string,
+  input: UgcProjectInput,
+): Promise<UgcProject> {
+  const { data, error } = await supabase
+    .from('ugc_projects')
+    .insert({ brand_id: brandId, ...input })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as UgcProject;
+}
+
+export async function getUgcProject(projectId: string): Promise<UgcProject | null> {
+  const { data } = await supabase
+    .from('ugc_projects')
+    .select('*')
+    .eq('id', projectId)
+    .single();
+  return data as UgcProject | null;
+}
+
+export async function getUgcProjectsByBrand(brandId: string): Promise<UgcProject[]> {
+  const { data } = await supabase
+    .from('ugc_projects')
+    .select('*')
+    .eq('brand_id', brandId)
+    .order('created_at', { ascending: false });
+  return (data ?? []) as UgcProject[];
+}
+
+export async function getUgcProjectsByCreator(creatorId: string): Promise<UgcProject[]> {
+  const { data } = await supabase
+    .from('ugc_projects')
+    .select('*')
+    .eq('creator_id', creatorId)
+    .order('created_at', { ascending: false });
+  return (data ?? []) as UgcProject[];
+}
+
+export async function updateUgcProjectStatus(
+  projectId: string,
+  status: UgcProjectStatus,
+): Promise<void> {
+  const { error } = await supabase
+    .from('ugc_projects')
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq('id', projectId);
+  if (error) throw error;
+}
+
+export async function submitUgcDelivery(
+  projectId: string,
+  creatorId: string,
+  contentUrls: string[],
+  meta: { format?: string; duration_seconds?: number; notes?: string; revision_round?: number },
+): Promise<void> {
+  const { error: delErr } = await supabase
+    .from('ugc_deliveries')
+    .insert({ project_id: projectId, creator_id: creatorId, content_urls: contentUrls, ...meta });
+  if (delErr) throw delErr;
+
+  await updateUgcProjectStatus(projectId, 'brand_reviewing');
+}
+
+export async function getUgcDeliveries(projectId: string): Promise<UgcDelivery[]> {
+  const { data } = await supabase
+    .from('ugc_deliveries')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('submitted_at', { ascending: false });
+  return (data ?? []) as UgcDelivery[];
+}
+
 /** Analytics agregados de la marca: alcance total, colaboraciones, top influencers. */
 export async function getBrandAnalytics(brandId: string) {
   const { data } = await supabase

@@ -11,11 +11,10 @@ import { useRouter } from 'next/navigation';
 import {
   Search, SlidersHorizontal, Star, Shield, Zap, MapPin,
   Users, TrendingUp, Lock, MessageCircle, ChevronRight, Flame,
-  Send, CheckCircle,
+  Send, CheckCircle, Video, Camera, Film,
 } from 'lucide-react';
 
-/* ─── MOCK DATA ────────────────────────────────────────────────────── */
-// Imágenes: picsum.photos (licencia CC0 — sin copyright, uso libre)
+/* ─── MOCK DATA — INFLUENCERS ──────────────────────────────────────────── */
 const INFLUENCERS = [
   {
     id: 1, name: 'Laura Sánchez', handle: '@laurastyle', niche: 'Moda', city: 'Madrid',
@@ -83,6 +82,59 @@ const INFLUENCERS = [
   },
 ];
 
+/* ─── MOCK DATA — UGC CREATORS ─────────────────────────────────────────── */
+const UGC_CREATORS = [
+  {
+    id: 201, name: 'Claudia Moreno', handle: '@claudiavisual', niche: 'Lifestyle', city: 'Madrid',
+    content_types: ['video', 'reel', 'foto'],
+    price_video: 180, price_photo: 90,
+    verified: true, rating: 4.9, reviews: 31, available: true, featured: true,
+    img: 'https://picsum.photos/seed/claudia-m/400/500',
+    portfolio: Array.from({ length: 3 }, (_, i) => `https://picsum.photos/seed/ugc-cl${i}/300/300`),
+  },
+  {
+    id: 202, name: 'David Soria', handle: '@davidcreates', niche: 'Gastronomía', city: 'Sevilla',
+    content_types: ['video', 'foto', 'carrusel'],
+    price_video: 150, price_photo: 70,
+    verified: true, rating: 5.0, reviews: 24, available: true, featured: true,
+    img: 'https://picsum.photos/seed/david-s/400/500',
+    portfolio: Array.from({ length: 3 }, (_, i) => `https://picsum.photos/seed/ugc-dv${i}/300/300`),
+  },
+  {
+    id: 203, name: 'Nuria Blanco', handle: '@nuriacontent', niche: 'Belleza', city: 'Barcelona',
+    content_types: ['reel', 'story', 'foto'],
+    price_video: 200, price_photo: 100,
+    verified: false, rating: 4.7, reviews: 19, available: true, featured: false,
+    img: 'https://picsum.photos/seed/nuria-b/400/500',
+    portfolio: Array.from({ length: 3 }, (_, i) => `https://picsum.photos/seed/ugc-nu${i}/300/300`),
+  },
+  {
+    id: 204, name: 'Tomás Gil', handle: '@tomasgil', niche: 'Fitness', city: 'Madrid',
+    content_types: ['video', 'reel'],
+    price_video: 220, price_photo: 110,
+    verified: true, rating: 4.8, reviews: 42, available: false, featured: false,
+    img: 'https://picsum.photos/seed/tomas-g/400/500',
+    portfolio: Array.from({ length: 3 }, (_, i) => `https://picsum.photos/seed/ugc-tg${i}/300/300`),
+  },
+  {
+    id: 205, name: 'Irene Vidal', handle: '@irenelifestyle', niche: 'Moda', city: 'Valencia',
+    content_types: ['video', 'foto', 'carrusel', 'reel'],
+    price_video: 160, price_photo: 80,
+    verified: true, rating: 4.6, reviews: 11, available: true, featured: false,
+    img: 'https://picsum.photos/seed/irene-v/400/500',
+    portfolio: Array.from({ length: 3 }, (_, i) => `https://picsum.photos/seed/ugc-ir${i}/300/300`),
+  },
+  {
+    id: 206, name: 'Marcos Fuentes', handle: '@marcosfilm', niche: 'Tecnología', city: 'Bilbao',
+    content_types: ['video', 'reel'],
+    price_video: 250, price_photo: 120,
+    verified: true, rating: 4.9, reviews: 38, available: true, featured: false,
+    img: 'https://picsum.photos/seed/marcos-f/400/500',
+    portfolio: Array.from({ length: 3 }, (_, i) => `https://picsum.photos/seed/ugc-mf${i}/300/300`),
+  },
+];
+
+/* ─── MOCK DATA — COLLABS ──────────────────────────────────────────────── */
 const COLLABS = [
   {
     id: 1, uuid: 'c1a2b3c4-0001-0000-0000-000000000001',
@@ -129,13 +181,21 @@ const COLLABS = [
 const NICHES = ['Todos', 'Gastronomía', 'Moda', 'Fitness', 'Viajes', 'Bienestar', 'Tecnología', 'Belleza'];
 const CITIES = ['Todas', 'Madrid', 'Barcelona', 'Sevilla', 'Valencia', 'Málaga'];
 
+const CONTENT_TYPE_ICONS: Record<string, React.ReactNode> = {
+  video:    <Video size={11} />,
+  reel:     <Film size={11} />,
+  foto:     <Camera size={11} />,
+  carrusel: <Camera size={11} />,
+  story:    <Film size={11} />,
+};
+
 function formatK(n: number) {
   return n >= 1_000_000 ? (n / 1_000_000).toFixed(1) + 'M' : n >= 1000 ? (n / 1000).toFixed(0) + 'K' : String(n);
 }
 
-/* ─── UNLOCK MODAL ─────────────────────────────────────────────────── */
+/* ─── UNLOCK MODAL ─────────────────────────────────────────────────────── */
 function UnlockModal({
-  inf, onClose, onUnlocked, credits, unlocking
+  inf, onClose, onUnlocked, credits, unlocking,
 }: {
   inf: typeof INFLUENCERS[0];
   onClose: () => void;
@@ -143,15 +203,12 @@ function UnlockModal({
   credits: number | null;
   unlocking: boolean;
 }) {
-  const [result, setResult] = useState<'idle'|'ok'|'no_credits'>('idle');
+  const [result, setResult] = useState<'idle' | 'ok' | 'no_credits'>('idle');
 
   const handleUnlock = async () => {
     const res = await onUnlocked(String(inf.id));
-    if (res?.success) {
-      setResult('ok');
-    } else if (res?.error_code === 'insufficient_credits') {
-      setResult('no_credits');
-    }
+    if (res?.success) setResult('ok');
+    else if (res?.error_code === 'insufficient_credits') setResult('no_credits');
   };
 
   const hasCredits = credits !== null && credits >= 10;
@@ -160,48 +217,21 @@ function UnlockModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-      <div
-        className="relative bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Cover image — blurred if locked, sharp if unlocked */}
+      <div className="relative bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="relative h-44 overflow-hidden">
-          <img
-            src={inf.cover}
-            alt=""
-            className={`w-full h-full object-cover transition-all duration-500 ${isOk ? 'scale-100' : 'scale-110 blur-sm'}`}
-          />
+          <img src={inf.cover} alt="" className={`w-full h-full object-cover transition-all duration-500 ${isOk ? 'scale-100' : 'scale-110 blur-sm'}`} />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
           <div className="absolute bottom-4 left-4 flex items-center gap-3">
-            <img
-              src={inf.img}
-              alt=""
-              className={`w-12 h-12 rounded-full border-2 border-white object-cover transition-all duration-500 ${isOk ? '' : 'blur-sm'}`}
-            />
+            <img src={inf.img} alt="" className={`w-12 h-12 rounded-full border-2 border-white object-cover transition-all duration-500 ${isOk ? '' : 'blur-sm'}`} />
             <div>
-              <div
-                className="text-white font-bold text-sm transition-all duration-500"
-                style={isOk ? {} : { filter: 'blur(5px)' }}
-              >
-                {inf.name}
-              </div>
-              <div
-                className="text-white/80 text-xs transition-all duration-500"
-                style={isOk ? {} : { filter: 'blur(4px)' }}
-              >
-                {inf.handle}
-              </div>
+              <div className="text-white font-bold text-sm transition-all duration-500" style={isOk ? {} : { filter: 'blur(5px)' }}>{inf.name}</div>
+              <div className="text-white/80 text-xs transition-all duration-500" style={isOk ? {} : { filter: 'blur(4px)' }}>{inf.handle}</div>
             </div>
           </div>
-          <button onClick={onClose} className="absolute top-3 right-3 w-7 h-7 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/50 transition-colors text-lg leading-none">
-            ×
-          </button>
+          <button onClick={onClose} className="absolute top-3 right-3 w-7 h-7 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/50 transition-colors text-lg leading-none">×</button>
         </div>
-
-        {/* Content */}
         <div className="p-5">
           {isOk ? (
-            /* ── Perfil desbloqueado: mostrar todos los datos ── */
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-base">🎉</div>
@@ -210,65 +240,39 @@ function UnlockModal({
                   <div className="text-xs text-gray-400">Ahora tienes acceso completo</div>
                 </div>
               </div>
-
-              {/* Datos completos */}
               <div className="space-y-2.5 mb-4">
                 <div className="flex items-center gap-2.5 p-3 bg-gray-50 rounded-xl">
-                  <span className="text-base">👤</span>
-                  <div>
-                    <div className="text-xs text-gray-400">Nombre real</div>
-                    <div className="text-sm font-semibold text-gray-900">{inf.name}</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2.5 p-3 bg-gray-50 rounded-xl">
                   <span className="text-base">📧</span>
-                  <div>
-                    <div className="text-xs text-gray-400">Email de contacto</div>
-                    <div className="text-sm font-semibold text-gray-900">{inf.email}</div>
-                  </div>
+                  <div><div className="text-xs text-gray-400">Email</div><div className="text-sm font-semibold text-gray-900">{inf.email}</div></div>
                 </div>
                 <div className="flex items-center gap-2.5 p-3 bg-gray-50 rounded-xl">
                   <span className="text-base">📱</span>
-                  <div>
-                    <div className="text-xs text-gray-400">Teléfono / WhatsApp</div>
-                    <div className="text-sm font-semibold text-gray-900">{inf.phone}</div>
-                  </div>
+                  <div><div className="text-xs text-gray-400">Teléfono</div><div className="text-sm font-semibold text-gray-900">{inf.phone}</div></div>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="p-3 bg-violet-50 rounded-xl text-center">
                     <div className="text-sm font-bold text-violet-700">{inf.priceMin}€ – {inf.priceMax}€</div>
-                    <div className="text-xs text-gray-400">Tarifa por campaña</div>
+                    <div className="text-xs text-gray-400">Tarifa</div>
                   </div>
                   <div className="p-3 bg-emerald-50 rounded-xl text-center">
                     <div className="text-sm font-bold text-emerald-600">{inf.er}% ER</div>
-                    <div className="text-xs text-gray-400">{formatK(inf.followers)} seguidores</div>
+                    <div className="text-xs text-gray-400">{formatK(inf.followers)} seg.</div>
                   </div>
                 </div>
               </div>
-
-              <Button fullWidth size="md" onClick={onClose}>
-                <MessageCircle size={15} /> Ir al perfil completo
-              </Button>
+              <Button fullWidth size="md" onClick={onClose}><MessageCircle size={15} /> Ver perfil</Button>
             </div>
           ) : (
-            /* ── Perfil bloqueado: FOMO + botón desbloquear ── */
             <>
               <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-2">
-                  <Lock size={16} className="text-violet-600" />
-                  <span className="font-bold text-gray-900 text-base">Perfil bloqueado</span>
-                </div>
+                <div className="flex items-center gap-2"><Lock size={16} className="text-violet-600" /><span className="font-bold text-gray-900 text-base">Perfil bloqueado</span></div>
                 {credits !== null && (
                   <div className="flex items-center gap-1 bg-violet-50 text-violet-700 text-xs font-bold px-2.5 py-1 rounded-full">
                     <Zap size={11} /> {credits} créditos
                   </div>
                 )}
               </div>
-              <p className="text-gray-500 text-sm mb-4">
-                Desbloquea para ver nombre, email, teléfono y tarifa exacta.
-              </p>
-
-              {/* Stats FOMO */}
+              <p className="text-gray-500 text-sm mb-4">Desbloquea para ver nombre, email, teléfono y tarifa exacta.</p>
               <div className="grid grid-cols-2 gap-3 mb-5">
                 <div className="bg-gray-50 rounded-xl p-3 text-center">
                   <div className="text-lg font-bold text-gray-900">{formatK(inf.followers)}</div>
@@ -279,26 +283,17 @@ function UnlockModal({
                   <div className="text-xs text-gray-400">Engagement</div>
                 </div>
               </div>
-
               {result === 'no_credits' && (
                 <div className="bg-red-50 border border-red-100 rounded-xl p-3 mb-3 text-center">
                   <div className="text-sm font-semibold text-red-600">Créditos insuficientes</div>
                   <div className="text-xs text-red-400">Necesitas 10 créditos — tienes {credits}</div>
                 </div>
               )}
-
               <div className="flex flex-col gap-2">
-                <Button fullWidth size="md" loading={unlocking} onClick={handleUnlock}>
-                  <Zap size={15} /> Desbloquear · 10 créditos
-                </Button>
-                <Button fullWidth size="md" variant="outline">
-                  Ver planes de suscripción
-                </Button>
+                <Button fullWidth size="md" loading={unlocking} onClick={handleUnlock} disabled={!hasCredits}><Zap size={15} /> Desbloquear · 10 créditos</Button>
+                <Button fullWidth size="md" variant="outline">Ver planes de suscripción</Button>
               </div>
-
-              <p className="text-center text-xs text-gray-400 mt-3">
-                Con el plan Starter tienes acceso ilimitado
-              </p>
+              <p className="text-center text-xs text-gray-400 mt-3">Con el plan Starter tienes acceso ilimitado</p>
             </>
           )}
         </div>
@@ -307,7 +302,7 @@ function UnlockModal({
   );
 }
 
-/* ─── INFLUENCER CARD ──────────────────────────────────────────────── */
+/* ─── INFLUENCER CARD ──────────────────────────────────────────────────── */
 function InfluencerCard({
   inf, featured, credits, unlocking, onUnlock, isUnlocked,
 }: {
@@ -327,101 +322,40 @@ function InfluencerCard({
         onClick={() => locked && setShowModal(true)}
         className={`group bg-white rounded-2xl overflow-hidden border transition-all duration-200 hover:shadow-xl hover:-translate-y-0.5 cursor-pointer ${featured ? 'border-violet-300 ring-2 ring-violet-100 shadow-md' : 'border-gray-100 shadow-sm'}`}
       >
-        {/* Cover image — siempre nítida */}
         <div className="relative h-44 sm:h-48 overflow-hidden bg-gray-100">
-          <img
-            src={inf.cover}
-            alt={inf.niche}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          />
-
-          {/* Gradient */}
+          <img src={inf.cover} alt={inf.niche} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-
-          {/* Top badges */}
           <div className="absolute top-3 left-3 flex gap-1.5">
-            {featured && (
-              <span className="flex items-center gap-1 bg-violet-600 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-lg">
-                <Zap size={10} fill="white" /> Destacado
-              </span>
-            )}
-            {inf.verified && (
-              <span className="flex items-center gap-1 bg-white/90 backdrop-blur-sm text-violet-700 text-xs font-bold px-2 py-1 rounded-full">
-                <Shield size={10} /> Pro
-              </span>
-            )}
+            {featured && <span className="flex items-center gap-1 bg-violet-600 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-lg"><Zap size={10} fill="white" /> Destacado</span>}
+            {inf.verified && <span className="flex items-center gap-1 bg-white/90 backdrop-blur-sm text-violet-700 text-xs font-bold px-2 py-1 rounded-full"><Shield size={10} /> Pro</span>}
           </div>
-
-          {/* Bottom info — PANEL TRASLÚCIDO sobre nombre si bloqueado */}
           <div className="absolute bottom-0 left-0 right-0">
             {locked ? (
-              /* Panel glassmorphism */
-              <div
-                className="flex items-center gap-2.5 px-3 py-2.5"
-                style={{
-                  background: 'rgba(255,255,255,0.18)',
-                  backdropFilter: 'blur(16px)',
-                  WebkitBackdropFilter: 'blur(16px)',
-                  borderTop: '1px solid rgba(255,255,255,0.25)',
-                }}
-              >
-                {/* Avatar borroso */}
-                <img
-                  src={inf.img}
-                  alt=""
-                  className="w-8 h-8 rounded-full border border-white/50 object-cover flex-shrink-0"
-                  style={{ filter: 'blur(6px)' }}
-                />
+              <div className="flex items-center gap-2.5 px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.18)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderTop: '1px solid rgba(255,255,255,0.25)' }}>
+                <img src={inf.img} alt="" className="w-8 h-8 rounded-full border border-white/50 object-cover flex-shrink-0" style={{ filter: 'blur(6px)' }} />
                 <div className="flex-1 min-w-0">
-                  {/* Nombre pixelado */}
-                  <div
-                    className="text-sm font-bold text-white leading-tight truncate select-none"
-                    style={{ filter: 'blur(5px)', userSelect: 'none' }}
-                  >
-                    {inf.name}
-                  </div>
-                  <div
-                    className="text-xs text-white/80 truncate select-none"
-                    style={{ filter: 'blur(4px)', userSelect: 'none' }}
-                  >
-                    {inf.handle}
-                  </div>
+                  <div className="text-sm font-bold text-white leading-tight truncate select-none" style={{ filter: 'blur(5px)', userSelect: 'none' }}>{inf.name}</div>
+                  <div className="text-xs text-white/80 truncate select-none" style={{ filter: 'blur(4px)', userSelect: 'none' }}>{inf.handle}</div>
                 </div>
-                <div className="flex-shrink-0 flex items-center gap-1 bg-white/20 backdrop-blur-sm rounded-full px-2 py-1">
-                  <Lock size={11} className="text-white" />
-                  <span className="text-white text-xs font-semibold">Ver</span>
-                </div>
+                <div className="flex-shrink-0 flex items-center gap-1 bg-white/20 backdrop-blur-sm rounded-full px-2 py-1"><Lock size={11} className="text-white" /><span className="text-white text-xs font-semibold">Ver</span></div>
               </div>
             ) : (
-              /* Panel normal sin blur */
               <div className="flex items-center gap-2.5 px-3 pb-3">
-                <img
-                  src={inf.img}
-                  alt={inf.name}
-                  className="w-8 h-8 rounded-full border-2 border-white object-cover shadow-md"
-                />
+                <img src={inf.img} alt={inf.name} className="w-8 h-8 rounded-full border-2 border-white object-cover shadow-md" />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-bold text-white leading-tight truncate">{inf.name}</div>
                   <div className="text-xs text-white/80 truncate">{inf.handle}</div>
                 </div>
-                {inf.available && (
-                  <span className="text-xs bg-emerald-500 text-white font-semibold px-2 py-0.5 rounded-full flex-shrink-0">
-                    Libre
-                  </span>
-                )}
+                {inf.available && <span className="text-xs bg-emerald-500 text-white font-semibold px-2 py-0.5 rounded-full flex-shrink-0">Libre</span>}
               </div>
             )}
           </div>
         </div>
-
-        {/* Card body */}
         <div className="p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-1.5">
               <Badge variant="default" size="sm">{inf.niche}</Badge>
-              <span className="flex items-center gap-0.5 text-xs text-gray-400">
-                <MapPin size={10} />{inf.city}
-              </span>
+              <span className="flex items-center gap-0.5 text-xs text-gray-400"><MapPin size={10} />{inf.city}</span>
             </div>
             <div className="flex items-center gap-1 text-xs">
               <Star size={11} className="text-amber-400 fill-amber-400" />
@@ -429,8 +363,6 @@ function InfluencerCard({
               <span className="text-gray-400">({inf.reviews})</span>
             </div>
           </div>
-
-          {/* Stats */}
           <div className="grid grid-cols-3 gap-2 mb-4">
             <div className="text-center">
               <div className="text-sm font-bold text-gray-900">{formatK(inf.followers)}</div>
@@ -441,48 +373,122 @@ function InfluencerCard({
               <div className="text-xs text-gray-400">Engagement</div>
             </div>
             <div className="text-center">
-              <div className={`text-sm font-bold text-gray-900 ${locked ? 'select-none' : ''}`}
-                style={locked ? { filter: 'blur(4px)' } : {}}>
-                {inf.priceMin}€
-              </div>
+              <div className={`text-sm font-bold text-gray-900 ${locked ? 'select-none' : ''}`} style={locked ? { filter: 'blur(4px)' } : {}}>{inf.priceMin}€</div>
               <div className="text-xs text-gray-400">Desde</div>
             </div>
           </div>
-
           {locked ? (
-            <Button variant="secondary" size="sm" fullWidth onClick={() => setShowModal(true)}>
-              <Lock size={13} /> Desbloquear perfil
-            </Button>
+            <Button variant="secondary" size="sm" fullWidth onClick={() => setShowModal(true)}><Lock size={13} /> Desbloquear perfil</Button>
           ) : (
-            <Button variant={featured ? 'primary' : 'outline'} size="sm" fullWidth>
-              <MessageCircle size={13} /> Contactar
-            </Button>
+            <Button variant={featured ? 'primary' : 'outline'} size="sm" fullWidth><MessageCircle size={13} /> Contactar</Button>
           )}
         </div>
       </div>
-
-      {showModal && (
-        <UnlockModal
-          inf={inf}
-          onClose={() => setShowModal(false)}
-          onUnlocked={onUnlock}
-          credits={credits}
-          unlocking={unlocking}
-        />
-      )}
+      {showModal && <UnlockModal inf={inf} onClose={() => setShowModal(false)} onUnlocked={onUnlock} credits={credits} unlocking={unlocking} />}
     </>
   );
 }
 
-/* ─── APPLY MODAL ──────────────────────────────────────────────────── */
-function ApplyModal({
-  collab, userId, onClose, onApplied,
+/* ─── UGC CREATOR CARD ─────────────────────────────────────────────────── */
+function UgcCreatorCard({
+  creator, featured, userType, userId,
 }: {
-  collab: typeof COLLABS[0];
-  userId: string;
-  onClose: () => void;
-  onApplied: () => void;
+  creator: typeof UGC_CREATORS[0];
+  featured?: boolean;
+  userType: string | null;
+  userId: string | null;
 }) {
+  const router = useRouter();
+
+  const handleContact = () => {
+    if (!userId) { router.push('/login'); return; }
+    if (userType === 'brand') router.push('/dashboard/brand/ugc/new');
+  };
+
+  return (
+    <div className={`group bg-white rounded-2xl overflow-hidden border transition-all duration-200 hover:shadow-xl hover:-translate-y-0.5 ${featured ? 'border-violet-300 ring-2 ring-violet-100 shadow-md' : 'border-gray-100 shadow-sm'}`}>
+      {/* Portfolio grid 3 fotos */}
+      <div className="relative h-40 grid grid-cols-3 gap-0.5 overflow-hidden bg-gray-100">
+        {creator.portfolio.map((src, i) => (
+          <div key={i} className={`overflow-hidden ${i === 0 ? 'col-span-2 row-span-2' : ''}`} style={i === 0 ? { gridRow: 'span 2' } : {}}>
+            <img src={src} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+          </div>
+        ))}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+
+        {/* UGC badge */}
+        <div className="absolute top-2.5 left-2.5 flex gap-1.5">
+          <span className="flex items-center gap-1 bg-violet-600 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-lg">
+            <Video size={10} fill="white" /> UGC
+          </span>
+          {featured && <span className="flex items-center gap-1 bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded-full"><Zap size={10} fill="white" /> Top</span>}
+        </div>
+
+        {/* Creator info */}
+        <div className="absolute bottom-0 left-0 right-0 flex items-center gap-2.5 px-3 pb-3">
+          <img src={creator.img} alt={creator.name} className="w-8 h-8 rounded-full border-2 border-white object-cover shadow-md" />
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-bold text-white leading-tight truncate">{creator.name}</div>
+            <div className="text-xs text-white/80 truncate">{creator.handle}</div>
+          </div>
+          {creator.available
+            ? <span className="text-xs bg-emerald-500 text-white font-semibold px-2 py-0.5 rounded-full flex-shrink-0">Libre</span>
+            : <span className="text-xs bg-gray-500/80 text-white font-semibold px-2 py-0.5 rounded-full flex-shrink-0">Ocupado</span>
+          }
+        </div>
+      </div>
+
+      {/* Card body */}
+      <div className="p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-1.5">
+            <Badge variant="default" size="sm">{creator.niche}</Badge>
+            <span className="flex items-center gap-0.5 text-xs text-gray-400"><MapPin size={10} />{creator.city}</span>
+          </div>
+          <div className="flex items-center gap-1 text-xs">
+            <Star size={11} className="text-amber-400 fill-amber-400" />
+            <span className="font-bold text-gray-900">{creator.rating}</span>
+            <span className="text-gray-400">({creator.reviews})</span>
+          </div>
+        </div>
+
+        {/* Content types */}
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {creator.content_types.map(ct => (
+            <span key={ct} className="flex items-center gap-1 px-2 py-0.5 bg-violet-50 text-violet-700 rounded-full text-xs font-medium">
+              {CONTENT_TYPE_ICONS[ct]} {ct}
+            </span>
+          ))}
+        </div>
+
+        {/* Pricing */}
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          <div className="bg-gray-50 rounded-xl p-2.5 text-center">
+            <div className="text-sm font-bold text-gray-900">{creator.price_video}€</div>
+            <div className="text-xs text-gray-400">por vídeo</div>
+          </div>
+          <div className="bg-gray-50 rounded-xl p-2.5 text-center">
+            <div className="text-sm font-bold text-gray-900">{creator.price_photo}€</div>
+            <div className="text-xs text-gray-400">por foto</div>
+          </div>
+        </div>
+
+        <Button
+          variant={featured ? 'primary' : 'outline'}
+          size="sm"
+          fullWidth
+          onClick={handleContact}
+          disabled={!creator.available}
+        >
+          {!userId ? 'Entra para contactar' : userType === 'brand' ? 'Enviar briefing' : 'Ver perfil'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/* ─── APPLY MODAL ──────────────────────────────────────────────────────── */
+function ApplyModal({ collab, userId, onClose, onApplied }: { collab: typeof COLLABS[0]; userId: string; onClose: () => void; onApplied: () => void }) {
   const [message, setMessage] = useState('');
   const [state, setState] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
@@ -506,11 +512,7 @@ function ApplyModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-      <div
-        className="relative bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Cover */}
+      <div className="relative bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="relative h-36 overflow-hidden">
           <img src={collab.cover} alt="" className="w-full h-full object-cover scale-105" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
@@ -518,14 +520,8 @@ function ApplyModal({
             <div className="text-white font-bold text-sm">{collab.brand}</div>
             <div className="text-white/70 text-xs">{collab.city}</div>
           </div>
-          <button
-            onClick={onClose}
-            className="absolute top-3 right-3 w-7 h-7 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/50 transition-colors text-lg leading-none"
-          >
-            ×
-          </button>
+          <button onClick={onClose} className="absolute top-3 right-3 w-7 h-7 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/50 transition-colors text-lg leading-none">×</button>
         </div>
-
         <div className="p-5">
           {state === 'ok' ? (
             <div className="text-center py-4">
@@ -538,42 +534,19 @@ function ApplyModal({
               <div className="mb-1">
                 <div className="font-bold text-gray-900 text-base leading-snug">{collab.title}</div>
                 <div className="flex items-center gap-2 mt-1 text-xs text-gray-400">
-                  <span className={`font-semibold px-2 py-0.5 rounded-full ${
-                    collab.type === 'Pago' ? 'bg-emerald-100 text-emerald-700' :
-                    collab.type === 'Canje' ? 'bg-amber-100 text-amber-700' :
-                    'bg-violet-100 text-violet-700'
-                  }`}>
+                  <span className={`font-semibold px-2 py-0.5 rounded-full ${collab.type === 'Pago' ? 'bg-emerald-100 text-emerald-700' : collab.type === 'Canje' ? 'bg-amber-100 text-amber-700' : 'bg-violet-100 text-violet-700'}`}>
                     {collab.type}{collab.budget ? ` · ${collab.budget}€` : ''}
                   </span>
                   <span>Hasta {collab.deadline}</span>
                 </div>
               </div>
-
               <div className="my-4">
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                  Mensaje para la marca <span className="text-gray-400 font-normal">(opcional)</span>
-                </label>
-                <textarea
-                  value={message}
-                  onChange={e => setMessage(e.target.value)}
-                  placeholder="Cuéntales por qué encajas con esta colaboración…"
-                  rows={3}
-                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
-                />
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Mensaje para la marca <span className="text-gray-400 font-normal">(opcional)</span></label>
+                <textarea value={message} onChange={e => setMessage(e.target.value)} placeholder="Cuéntales por qué encajas con esta colaboración…" rows={3} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none" />
               </div>
-
-              {state === 'error' && (
-                <div className="bg-red-50 border border-red-100 rounded-xl px-3 py-2.5 text-sm text-red-600 mb-3">
-                  {errorMsg}
-                </div>
-              )}
-
-              <Button fullWidth size="md" loading={state === 'loading'} onClick={handleApply}>
-                <Send size={15} /> Enviar solicitud
-              </Button>
-              <p className="text-center text-xs text-gray-400 mt-2">
-                {collab.applicants} personas ya han aplicado
-              </p>
+              {state === 'error' && <div className="bg-red-50 border border-red-100 rounded-xl px-3 py-2.5 text-sm text-red-600 mb-3">{errorMsg}</div>}
+              <Button fullWidth size="md" loading={state === 'loading'} onClick={handleApply}><Send size={15} /> Enviar solicitud</Button>
+              <p className="text-center text-xs text-gray-400 mt-2">{collab.applicants} personas ya han aplicado</p>
             </>
           )}
         </div>
@@ -582,21 +555,15 @@ function ApplyModal({
   );
 }
 
-/* ─── COLLAB CARD ──────────────────────────────────────────────────── */
-function CollabCard({
-  c, userId, userType,
-}: {
-  c: typeof COLLABS[0];
-  userId: string | null;
-  userType: string | null;
-}) {
+/* ─── COLLAB CARD ──────────────────────────────────────────────────────── */
+function CollabCard({ c, userId, userType }: { c: typeof COLLABS[0]; userId: string | null; userType: string | null }) {
   const router = useRouter();
   const [showModal, setShowModal] = useState(false);
   const [applied, setApplied] = useState(false);
 
   const handleApplyClick = () => {
     if (!userId) { router.push('/login'); return; }
-    if (userType === 'brand') return; // marcas no pueden aplicar
+    if (userType === 'brand') return;
     setShowModal(true);
   };
 
@@ -605,85 +572,50 @@ function CollabCard({
   return (
     <>
       <div className={`group bg-white rounded-2xl overflow-hidden border transition-all duration-200 hover:shadow-xl hover:-translate-y-0.5 cursor-pointer ${c.boosted ? 'border-violet-300 ring-2 ring-violet-100 shadow-md' : 'border-gray-100 shadow-sm'}`}>
-        {/* Cover */}
         <div className="relative h-36 sm:h-40 overflow-hidden bg-gray-100">
-          <img
-            src={c.cover}
-            alt={c.title}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          />
+          <img src={c.cover} alt={c.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-
           <div className="absolute top-3 left-3 flex gap-1.5">
-            {c.boosted && (
-              <span className="flex items-center gap-1 bg-violet-600 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-lg">
-                <Flame size={10} fill="white" /> Destacado
-              </span>
-            )}
+            {c.boosted && <span className="flex items-center gap-1 bg-violet-600 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-lg"><Flame size={10} fill="white" /> Destacado</span>}
           </div>
-
           <div className="absolute top-3 right-3">
             <span className={`text-xs font-bold px-2.5 py-1 rounded-full shadow-md ${c.type === 'Pago' ? 'bg-emerald-500 text-white' : c.type === 'Canje' ? 'bg-amber-500 text-white' : 'bg-violet-600 text-white'}`}>
               {c.type}{c.budget ? ` · ${c.budget}€` : ''}
             </span>
           </div>
-
           <div className="absolute bottom-3 left-3 right-3 flex items-center gap-2">
             <Avatar name={c.brand} size="sm" className="border-2 border-white shadow" />
             <div>
               <div className="text-xs font-bold text-white">{c.brand}</div>
-              <div className="flex items-center gap-1 text-xs text-white/70">
-                <MapPin size={9} />{c.city}
-              </div>
+              <div className="flex items-center gap-1 text-xs text-white/70"><MapPin size={9} />{c.city}</div>
             </div>
           </div>
         </div>
-
-        {/* Body */}
         <div className="p-4">
-          <div className="text-sm font-semibold text-gray-900 leading-snug mb-2 line-clamp-2">
-            {c.title}
-          </div>
+          <div className="text-sm font-semibold text-gray-900 leading-snug mb-2 line-clamp-2">{c.title}</div>
           <p className="text-xs text-gray-400 line-clamp-1 mb-3">{c.description}</p>
-
           <div className="flex items-center justify-between mb-3 text-xs text-gray-400">
-            <span className="flex items-center gap-1">
-              <Users size={11} />{applied ? c.applicants + 1 : c.applicants} solicitudes
-            </span>
+            <span className="flex items-center gap-1"><Users size={11} />{applied ? c.applicants + 1 : c.applicants} solicitudes</span>
             <span>Hasta {c.deadline}</span>
           </div>
-
           {applied ? (
-            <div className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-semibold">
-              <CheckCircle size={13} /> Solicitud enviada
-            </div>
+            <div className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-semibold"><CheckCircle size={13} /> Solicitud enviada</div>
           ) : isBrand ? (
-            <div className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-50 text-gray-400 text-xs font-medium cursor-not-allowed">
-              Solo para creadores
-            </div>
+            <div className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-50 text-gray-400 text-xs font-medium cursor-not-allowed">Solo para creadores</div>
           ) : (
-            <Button variant="primary" size="sm" fullWidth onClick={handleApplyClick}>
-              {!userId ? 'Entra para aplicar' : 'Aplicar ahora'}
-            </Button>
+            <Button variant="primary" size="sm" fullWidth onClick={handleApplyClick}>{!userId ? 'Entra para aplicar' : 'Aplicar ahora'}</Button>
           )}
         </div>
       </div>
-
-      {showModal && userId && (
-        <ApplyModal
-          collab={c}
-          userId={userId}
-          onClose={() => setShowModal(false)}
-          onApplied={() => setApplied(true)}
-        />
-      )}
+      {showModal && userId && <ApplyModal collab={c} userId={userId} onClose={() => setShowModal(false)} onApplied={() => setApplied(true)} />}
     </>
   );
 }
 
-/* ─── MAIN PAGE ────────────────────────────────────────────────────── */
+/* ─── MAIN PAGE ────────────────────────────────────────────────────────── */
 export default function DiscoverPage() {
   const [tab, setTab] = useState<'influencers' | 'collabs'>('influencers');
+  const [creatorFilter, setCreatorFilter] = useState<'all' | 'influencer' | 'ugc'>('all');
   const [niche, setNiche] = useState('Todos');
   const [city, setCity] = useState('Todas');
   const [query, setQuery] = useState('');
@@ -692,8 +624,6 @@ export default function DiscoverPage() {
   const userType = (user?.user_metadata?.user_type as string | undefined) ?? null;
   const { credits, loading: unlocking, unlock, persistedUnlocked } = useCredits(user?.id ?? null);
 
-  // persistedUnlocked viene del hook (cargado desde Supabase al montar + actualizado al desbloquear)
-  // isUnlocked recibe string IDs — compara como string para evitar type mismatch
   const isUnlocked = (infId: number) => persistedUnlocked.has(String(infId));
 
   const handleUnlock = async (id: string) => {
@@ -701,6 +631,7 @@ export default function DiscoverPage() {
     return result ?? { success: false };
   };
 
+  // Filtered influencers
   const filteredInfluencers = INFLUENCERS.filter(i => {
     const matchNiche = niche === 'Todos' || i.niche === niche;
     const matchCity = city === 'Todas' || i.city === city;
@@ -708,8 +639,13 @@ export default function DiscoverPage() {
     return matchNiche && matchCity && matchQ;
   });
 
-  const featured = filteredInfluencers.filter(i => i.featured);
-  const rest = filteredInfluencers.filter(i => !i.featured);
+  // Filtered UGC creators
+  const filteredUgc = UGC_CREATORS.filter(c => {
+    const matchNiche = niche === 'Todos' || c.niche === niche;
+    const matchCity = city === 'Todas' || c.city === city;
+    const matchQ = !query || c.name.toLowerCase().includes(query.toLowerCase()) || c.handle.includes(query.toLowerCase());
+    return matchNiche && matchCity && matchQ;
+  });
 
   const filteredCollabs = COLLABS.filter(c => {
     const matchNiche = niche === 'Todos' || c.niche === niche;
@@ -718,8 +654,14 @@ export default function DiscoverPage() {
     return matchNiche && matchCity && matchQ;
   });
 
-  const featuredCollabs = filteredCollabs.filter(c => c.boosted);
-  const restCollabs = filteredCollabs.filter(c => !c.boosted);
+  const showInfluencers = creatorFilter === 'all' || creatorFilter === 'influencer';
+  const showUgc = creatorFilter === 'all' || creatorFilter === 'ugc';
+  const featuredInfluencers = showInfluencers ? filteredInfluencers.filter(i => i.featured) : [];
+  const restInfluencers = showInfluencers ? filteredInfluencers.filter(i => !i.featured) : [];
+  const featuredUgc = showUgc ? filteredUgc.filter(c => c.featured) : [];
+  const restUgc = showUgc ? filteredUgc.filter(c => !c.featured) : [];
+
+  const totalCount = (showInfluencers ? filteredInfluencers.length : 0) + (showUgc ? filteredUgc.length : 0);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -766,6 +708,28 @@ export default function DiscoverPage() {
               </button>
             </div>
 
+            {/* Creator type sub-filter (solo en tab creadores) */}
+            {tab === 'influencers' && (
+              <div className="flex items-center gap-2 mb-3">
+                <div className="flex rounded-xl bg-gray-100 p-0.5 gap-0.5">
+                  {(['all', 'influencer', 'ugc'] as const).map(f => (
+                    <button
+                      key={f}
+                      onClick={() => setCreatorFilter(f)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${creatorFilter === f ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                      {f === 'all' && 'Todos'}
+                      {f === 'influencer' && <><Users size={11} /> Influencers</>}
+                      {f === 'ugc' && <><Video size={11} /> UGC</>}
+                    </button>
+                  ))}
+                </div>
+                {creatorFilter === 'ugc' && (
+                  <span className="text-xs text-gray-400">Creadores de contenido sin audiencia — solo el vídeo/foto para tu marca</span>
+                )}
+              </div>
+            )}
+
             {/* Filter panel */}
             {showFilters ? (
               <div className="flex flex-wrap gap-4 py-2">
@@ -773,10 +737,7 @@ export default function DiscoverPage() {
                   <div className="text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wide">Nicho</div>
                   <div className="flex flex-wrap gap-1.5">
                     {NICHES.map(n => (
-                      <button key={n} onClick={() => setNiche(n)}
-                        className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${niche === n ? 'bg-violet-600 text-white border-violet-600' : 'border-gray-200 text-gray-600 bg-white hover:border-violet-300'}`}>
-                        {n}
-                      </button>
+                      <button key={n} onClick={() => setNiche(n)} className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${niche === n ? 'bg-violet-600 text-white border-violet-600' : 'border-gray-200 text-gray-600 bg-white hover:border-violet-300'}`}>{n}</button>
                     ))}
                   </div>
                 </div>
@@ -784,22 +745,15 @@ export default function DiscoverPage() {
                   <div className="text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wide">Ciudad</div>
                   <div className="flex flex-wrap gap-1.5">
                     {CITIES.map(c => (
-                      <button key={c} onClick={() => setCity(c)}
-                        className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${city === c ? 'bg-violet-600 text-white border-violet-600' : 'border-gray-200 text-gray-600 bg-white hover:border-violet-300'}`}>
-                        {c}
-                      </button>
+                      <button key={c} onClick={() => setCity(c)} className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${city === c ? 'bg-violet-600 text-white border-violet-600' : 'border-gray-200 text-gray-600 bg-white hover:border-violet-300'}`}>{c}</button>
                     ))}
                   </div>
                 </div>
               </div>
             ) : (
-              /* Niche pills scroll */
               <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-hide">
                 {NICHES.map(n => (
-                  <button key={n} onClick={() => setNiche(n)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap border transition-all flex-shrink-0 ${niche === n ? 'bg-violet-600 text-white border-violet-600' : 'border-gray-200 text-gray-600 bg-white hover:border-violet-300'}`}>
-                    {n}
-                  </button>
+                  <button key={n} onClick={() => setNiche(n)} className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap border transition-all flex-shrink-0 ${niche === n ? 'bg-violet-600 text-white border-violet-600' : 'border-gray-200 text-gray-600 bg-white hover:border-violet-300'}`}>{n}</button>
                 ))}
               </div>
             )}
@@ -810,83 +764,99 @@ export default function DiscoverPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
 
           {tab === 'influencers' ? (
-            <div>
+            <div className="space-y-10">
+
+              {/* Banner UGC info si está en filtro ugc */}
+              {creatorFilter === 'ugc' && (
+                <div className="bg-violet-50 border border-violet-200 rounded-2xl p-4 flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center flex-shrink-0 text-xl">🎬</div>
+                  <div>
+                    <div className="text-sm font-bold text-violet-900 mb-0.5">¿Qué es UGC?</div>
+                    <div className="text-xs text-violet-700">
+                      Los creadores UGC producen contenido de calidad profesional para que <strong>tú lo publiques</strong> en tus canales. No necesitas su audiencia — solo su talento creativo. Ideal para anuncios, redes sociales y web.
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Destacados */}
-              {featured.length > 0 && (
-                <section className="mb-10">
+              {(featuredInfluencers.length > 0 || featuredUgc.length > 0) && (
+                <section>
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
                       <Zap size={16} className="text-violet-600" />
-                      Creadores destacados
-                      <Badge variant="primary" size="sm">{featured.length}</Badge>
+                      Destacados
+                      <Badge variant="primary" size="sm">{featuredInfluencers.length + featuredUgc.length}</Badge>
                     </h2>
-                    <button className="text-xs text-violet-600 font-semibold flex items-center gap-1 hover:text-violet-700">
-                      Ver todos <ChevronRight size={14} />
-                    </button>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {featured.map(inf => (
-                      <InfluencerCard key={inf.id} inf={inf} featured credits={credits} unlocking={unlocking} onUnlock={handleUnlock} isUnlocked={isUnlocked(inf.id)} />
+                    {featuredInfluencers.map(inf => (
+                      <InfluencerCard key={`inf-${inf.id}`} inf={inf} featured credits={credits} unlocking={unlocking} onUnlock={handleUnlock} isUnlocked={isUnlocked(inf.id)} />
+                    ))}
+                    {featuredUgc.map(c => (
+                      <UgcCreatorCard key={`ugc-${c.id}`} creator={c} featured userType={userType} userId={user?.id ?? null} />
                     ))}
                   </div>
                 </section>
               )}
 
-              {/* Todos los demás */}
+              {/* Grid principal */}
               <section>
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-base font-bold text-gray-900">
-                    {niche !== 'Todos' ? niche : 'Todos los creadores'}
-                    <span className="text-gray-400 font-normal text-sm ml-2">{filteredInfluencers.length} perfiles</span>
+                    {creatorFilter === 'ugc' ? 'Creadores UGC' : creatorFilter === 'influencer' ? 'Influencers' : niche !== 'Todos' ? niche : 'Todos los creadores'}
+                    <span className="text-gray-400 font-normal text-sm ml-2">{totalCount} perfiles</span>
                   </h2>
                 </div>
 
-                {/* Credits banner */}
-                {rest.some(i => i.free) && (
+                {restInfluencers.some(i => i.free) && showInfluencers && (
                   <div className="flex items-center gap-3 bg-violet-50 border border-violet-200 rounded-2xl p-4 mb-5">
                     <Lock size={18} className="text-violet-600 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-semibold text-gray-900">Algunos perfiles están bloqueados</div>
                       <div className="text-xs text-gray-500">Consigue créditos para acceder a todos los contactos sin límite</div>
                     </div>
-                    <Button variant="secondary" size="sm" className="flex-shrink-0">
-                      Ver planes
-                    </Button>
+                    <Button variant="secondary" size="sm" className="flex-shrink-0">Ver planes</Button>
                   </div>
                 )}
 
                 <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {rest.map(inf => (
-                    <InfluencerCard key={inf.id} inf={inf} credits={credits} unlocking={unlocking} onUnlock={handleUnlock} isUnlocked={isUnlocked(inf.id)} />
+                  {restInfluencers.map(inf => (
+                    <InfluencerCard key={`inf-${inf.id}`} inf={inf} credits={credits} unlocking={unlocking} onUnlock={handleUnlock} isUnlocked={isUnlocked(inf.id)} />
+                  ))}
+                  {restUgc.map(c => (
+                    <UgcCreatorCard key={`ugc-${c.id}`} creator={c} userType={userType} userId={user?.id ?? null} />
                   ))}
                 </div>
+
+                {totalCount === 0 && (
+                  <div className="text-center py-16">
+                    <div className="text-3xl mb-3">🔍</div>
+                    <div className="text-sm font-semibold text-gray-700">Sin resultados</div>
+                    <div className="text-xs text-gray-400 mt-1">Prueba con otros filtros</div>
+                  </div>
+                )}
               </section>
             </div>
           ) : (
             <div>
-              {/* Colaboraciones destacadas */}
-              {featuredCollabs.length > 0 && (
+              {filteredCollabs.filter(c => c.boosted).length > 0 && (
                 <section className="mb-10">
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                      <Flame size={16} className="text-orange-500" />
-                      Colaboraciones destacadas
-                    </h2>
+                    <h2 className="text-base font-bold text-gray-900 flex items-center gap-2"><Flame size={16} className="text-orange-500" /> Colaboraciones destacadas</h2>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {featuredCollabs.map(c => <CollabCard key={c.id} c={c} userId={user?.id ?? null} userType={userType} />)}
+                    {filteredCollabs.filter(c => c.boosted).map(c => <CollabCard key={c.id} c={c} userId={user?.id ?? null} userType={userType} />)}
                   </div>
                 </section>
               )}
-
-              {/* Resto */}
               <section>
                 <h2 className="text-base font-bold text-gray-900 mb-4">
                   Todas las colaboraciones
                   <span className="text-gray-400 font-normal text-sm ml-2">{filteredCollabs.length} abiertas</span>
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {restCollabs.map(c => <CollabCard key={c.id} c={c} userId={user?.id ?? null} userType={userType} />)}
+                  {filteredCollabs.filter(c => !c.boosted).map(c => <CollabCard key={c.id} c={c} userId={user?.id ?? null} userType={userType} />)}
                 </div>
               </section>
             </div>
