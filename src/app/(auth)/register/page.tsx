@@ -19,6 +19,7 @@ function RegisterForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState({ name: '', email: '', password: '', city: '', niche: '' });
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,6 +65,9 @@ function RegisterForm() {
       city: form.city || null,
       niche: form.niche || null,
       credits: 20,
+      terms_accepted: true,
+      terms_accepted_at: new Date().toISOString(),
+      terms_version: '1.0',
     });
 
     if (profileError) {
@@ -235,13 +239,34 @@ function RegisterForm() {
                   </div>
                 </div>
 
+                {/* Terms checkbox */}
+                <label className="flex items-start gap-3 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={termsAccepted}
+                    onChange={e => setTermsAccepted(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500 shrink-0"
+                  />
+                  <span className="text-xs text-gray-500 leading-relaxed">
+                    He leído y acepto los{' '}
+                    <Link href="/terms" target="_blank" className="text-violet-600 underline hover:text-violet-700">
+                      Términos y Condiciones
+                    </Link>
+                    {' '}y la{' '}
+                    <Link href="/privacy" target="_blank" className="text-violet-600 underline hover:text-violet-700">
+                      Política de Privacidad
+                    </Link>
+                    {' '}de Connectly. Entiendo que Connectly actúa únicamente como plataforma intermediaria y no se hace responsable de los acuerdos, contenidos, resultados o daños derivados de las colaboraciones entre marcas y creadores.
+                  </span>
+                </label>
+
                 {error && (
                   <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600">
                     {error}
                   </div>
                 )}
 
-                <Button type="submit" fullWidth size="lg" loading={loading}>
+                <Button type="submit" fullWidth size="lg" loading={loading} disabled={!termsAccepted}>
                   {loading ? 'Creando cuenta...' : 'Crear cuenta gratis'}
                 </Button>
               </>
@@ -255,12 +280,6 @@ function RegisterForm() {
             </Link>
           </p>
 
-          <p className="mt-4 text-center text-xs text-gray-400">
-            Al registrarte aceptas los{' '}
-            <Link href="/terms" className="underline hover:text-gray-600">Términos de uso</Link>
-            {' '}y la{' '}
-            <Link href="/privacy" className="underline hover:text-gray-600">Política de privacidad</Link>
-          </p>
         </div>
       </div>
     </div>
