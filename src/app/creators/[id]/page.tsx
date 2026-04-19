@@ -69,18 +69,28 @@ export default function CreatorProfilePage() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [notFound, setNotFound] = useState(false);
+
   useEffect(() => {
     if (!id) return;
     Promise.all([getPublicProfile(id), getReviewsForCreator(id)])
       .then(([data, revs]) => {
-        if (!data || data.user_type !== 'influencer') {
-          router.replace('/discover');
+        if (!data) {
+          setNotFound(true);
+          return;
+        }
+        if (data.user_type !== 'influencer') {
+          // Si es una marca, redirigir a su perfil de marca
+          router.replace(`/brands/${id}`);
           return;
         }
         setProfile(data);
         setReviews(revs);
       })
-      .catch(() => router.replace('/discover'))
+      .catch(err => {
+        console.error('Error loading creator profile:', err);
+        setNotFound(true);
+      })
       .finally(() => setLoading(false));
   }, [id, router]);
 
@@ -88,6 +98,31 @@ export default function CreatorProfilePage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (notFound) {
+    const isSelf = user?.id === id;
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="max-w-md text-center">
+          <div className="text-4xl mb-4">🔍</div>
+          <h1 className="text-lg font-bold text-gray-900 mb-2">
+            {isSelf ? 'Tu perfil aún no está configurado' : 'Perfil no encontrado'}
+          </h1>
+          <p className="text-sm text-gray-500 mb-6">
+            {isSelf
+              ? 'Tu cuenta se creó correctamente, pero falta completar el perfil público. Esto debería ocurrir automáticamente. Si persiste, contacta con soporte.'
+              : 'Este creador no existe o ya no está disponible.'}
+          </p>
+          <Link
+            href={isSelf ? '/dashboard/creator' : '/discover'}
+            className="inline-block px-5 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 transition-colors"
+          >
+            {isSelf ? 'Volver al dashboard' : 'Ver otros creadores'}
+          </Link>
+        </div>
       </div>
     );
   }
