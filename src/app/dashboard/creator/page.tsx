@@ -9,51 +9,27 @@ import {
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import { useAuth } from '@/components/AuthProvider';
-import { getApplicationsByCreator } from '@/lib/supabase';
-import type { ApplicationWithCollab } from '@/lib/supabase';
+import { getApplicationsByCreator, getPublicCollaborations } from '@/lib/supabase';
+import type { ApplicationWithCollab, PublicCollaboration } from '@/lib/supabase';
 import DeliveryModal from '@/components/DeliveryModal';
 
-/* ─── MOCK DATA ─────────────────────────────────────────────────── */
-const MOCK_APPLICATIONS = [
-  {
-    id: 1, brand: 'Casa Nova', title: 'Foodie para reels de nueva carta de primavera',
-    status: 'accepted' as const, appliedAt: 'hace 3d', budget: null, type: 'Canje',
-    logo: 'https://picsum.photos/seed/casanova/80/80',
-  },
-  {
-    id: 2, brand: 'Gymfit Studio', title: 'Campaña de lanzamiento de app de fitness',
-    status: 'pending' as const, appliedAt: 'hace 1d', budget: 300, type: 'Pago',
-    logo: 'https://picsum.photos/seed/gymfit/80/80',
-  },
-  {
-    id: 3, brand: 'SkinGlow', title: 'Embajadora para nueva gama de hidratantes premium',
-    status: 'pending' as const, appliedAt: 'hace 5h', budget: 250, type: 'Pago',
-    logo: 'https://picsum.photos/seed/skinglow-beauty/80/80',
-  },
-  {
-    id: 4, brand: 'Krave Clothing', title: 'Colección PV · perfil de moda urbana',
-    status: 'rejected' as const, appliedAt: 'hace 5d', budget: 200, type: 'Ambos',
-    logo: 'https://picsum.photos/seed/krave-clothing/80/80',
-  },
-];
+const COLLAB_TYPE_LABELS: Record<string, string> = {
+  canje: 'Canje',
+  pago: 'Pago',
+  mixto: 'Canje + Pago',
+};
 
-const MOCK_AVAILABLE = [
-  {
-    id: 1, brand: 'Naturalia Bio', title: 'Embajadores de bienestar para línea eco', niche: 'Bienestar',
-    city: 'Remoto', type: 'Pago', budget: 150, boosted: false, applicants: 5, deadline: '10 may',
-    cover: 'https://picsum.photos/seed/naturalia-eco/600/400',
-  },
-  {
-    id: 2, brand: 'FoodLab', title: 'Creador de contenido gastronómico para RRSS', niche: 'Gastronomía',
-    city: 'Sevilla', type: 'Canje', budget: null, boosted: true, applicants: 3, deadline: '25 abr',
-    cover: 'https://picsum.photos/seed/foodlab-rest/600/400',
-  },
-  {
-    id: 3, brand: 'ActiveWear', title: 'Influencer fitness para campaña de verano', niche: 'Fitness',
-    city: 'Remoto', type: 'Pago', budget: 350, boosted: false, applicants: 11, deadline: '1 may',
-    cover: 'https://picsum.photos/seed/active-sport/600/400',
-  },
-];
+function fmtDate(d: string | null): string {
+  if (!d) return 'sin fecha';
+  return new Date(d).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+}
+
+function availableBudget(c: PublicCollaboration): string {
+  if (c.collab_type === 'canje') return 'Canje';
+  if (!c.budget_min && !c.budget_max) return 'A convenir';
+  const n = c.budget_min ?? c.budget_max;
+  return `${n}€`;
+}
 
 const APP_STATUS = {
   pending:  { label: 'En espera', variant: 'warning' as const },
@@ -68,6 +44,7 @@ export default function CreatorDashboard() {
   const [applications, setApplications] = useState<ApplicationWithCollab[]>([]);
   const [loadingApps, setLoadingApps] = useState(true);
   const [deliveryApp, setDeliveryApp] = useState<ApplicationWithCollab | null>(null);
+  const [availableCollabs, setAvailableCollabs] = useState<PublicCollaboration[]>([]);
 
   const displayName = (user?.user_metadata?.display_name as string) ?? 'Creador';
 
@@ -80,6 +57,13 @@ export default function CreatorDashboard() {
       .finally(() => setLoadingApps(false));
   }, [user?.id]);
 
+  // Cargar colaboraciones públicas activas
+  useEffect(() => {
+    getPublicCollaborations()
+      .then(cs => setAvailableCollabs(cs.slice(0, 6)))
+      .catch(console.error);
+  }, []);
+
   const totalSent = applications.length;
   const accepted = applications.filter(a => a.status === 'accepted').length;
   const pending = applications.filter(a => a.status === 'pending').length;
@@ -91,7 +75,7 @@ export default function CreatorDashboard() {
           applicationId={deliveryApp.id}
           influencerId={user.id}
           brandId={deliveryApp.brand_id}
-          brandName={(deliveryApp.collab?.brand as { display_name: string } | null)?.display_name ?? 'Marca'}
+          brandName={deliveryApp.collab?.brand?.brand_name ?? 'Marca'}
           collabTitle={deliveryApp.collab?.title ?? ''}
           onClose={() => setDeliveryApp(null)}
           onDone={() => {
@@ -152,46 +136,67 @@ export default function CreatorDashboard() {
               </Link>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {MOCK_AVAILABLE.map(c => (
-                <div
-                  key={c.id}
-                  className={`bg-white rounded-2xl overflow-hidden border shadow-sm hover:shadow-md transition-all cursor-pointer ${
-                    c.boosted ? 'border-violet-200 ring-2 ring-violet-50' : 'border-gray-100'
-                  }`}
-                >
-                  <div className="relative h-32 overflow-hidden">
-                    <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
-                    {c.boosted && (
-                      <span className="absolute top-2 left-2 flex items-center gap-1 bg-violet-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                        <Flame size={9} fill="white" /> Destacada
-                      </span>
-                    )}
-                    <span className={`absolute top-2 right-2 text-xs font-bold px-2 py-0.5 rounded-full ${
-                      c.type === 'Pago' ? 'bg-emerald-500 text-white' : c.type === 'Canje' ? 'bg-amber-500 text-white' : 'bg-violet-600 text-white'
-                    }`}>
-                      {c.type}{c.budget ? ` · ${c.budget}€` : ''}
-                    </span>
-                    <div className="absolute bottom-2 left-3">
-                      <div className="text-white text-xs font-bold">{c.brand}</div>
-                      <div className="flex items-center gap-1 text-white/70 text-xs">
-                        <MapPin size={9} />{c.city}
+            {availableCollabs.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-8 text-center">
+                <div className="text-2xl mb-2">🔎</div>
+                <div className="text-sm font-semibold text-gray-700 mb-1">Aún no hay colaboraciones activas</div>
+                <div className="text-xs text-gray-400 mb-4">
+                  Cuando las marcas publiquen campañas, aparecerán aquí
+                </div>
+                <Button size="sm" variant="secondary" onClick={() => router.push('/discover?tab=collabs')}>
+                  Ir a Discover
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {availableCollabs.map(c => {
+                  const brandName = c.brand?.brand_name ?? 'Marca';
+                  const typeLabel = COLLAB_TYPE_LABELS[c.collab_type] ?? c.collab_type;
+                  const budgetStr = availableBudget(c);
+                  return (
+                    <div
+                      key={c.id}
+                      onClick={() => router.push('/discover?tab=collabs')}
+                      className={`bg-white rounded-2xl overflow-hidden border shadow-sm hover:shadow-md transition-all cursor-pointer ${
+                        c.is_boosted ? 'border-violet-200 ring-2 ring-violet-50' : 'border-gray-100'
+                      }`}
+                    >
+                      <div className="relative h-32 overflow-hidden bg-gradient-to-br from-violet-100 to-violet-50">
+                        {c.brand?.logo_url && (
+                          <img src={c.brand.logo_url} alt={brandName} className="w-full h-full object-cover" />
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+                        {c.is_boosted && (
+                          <span className="absolute top-2 left-2 flex items-center gap-1 bg-violet-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                            <Flame size={9} fill="white" /> Destacada
+                          </span>
+                        )}
+                        <span className={`absolute top-2 right-2 text-xs font-bold px-2 py-0.5 rounded-full ${
+                          c.collab_type === 'pago' ? 'bg-emerald-500 text-white' : c.collab_type === 'canje' ? 'bg-amber-500 text-white' : 'bg-violet-600 text-white'
+                        }`}>
+                          {typeLabel}{c.collab_type !== 'canje' && budgetStr !== 'A convenir' ? ` · ${budgetStr}` : ''}
+                        </span>
+                        <div className="absolute bottom-2 left-3">
+                          <div className="text-white text-xs font-bold">{brandName}</div>
+                          <div className="flex items-center gap-1 text-white/70 text-xs">
+                            <MapPin size={9} />{c.city ?? '—'}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="p-3">
+                        <div className="text-xs font-semibold text-gray-900 leading-snug line-clamp-2 mb-2">{c.title}</div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-400">Hasta {fmtDate(c.deadline)}</span>
+                          <Button size="sm" variant="secondary" className="text-xs py-1 px-3">
+                            Ver
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="p-3">
-                    <div className="text-xs font-semibold text-gray-900 leading-snug line-clamp-2 mb-2">{c.title}</div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-400">Hasta {c.deadline}</span>
-                      <Button size="sm" variant="secondary" className="text-xs py-1 px-3">
-                        Aplicar
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </section>
 
           {/* ── Mis aplicaciones ── */}
@@ -214,12 +219,12 @@ export default function CreatorDashboard() {
                     className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-4"
                   >
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-400 to-violet-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                      {app.collab?.brand?.display_name?.charAt(0).toUpperCase() ?? '?'}
+                      {app.collab?.brand?.brand_name?.charAt(0).toUpperCase() ?? '?'}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-0.5">
                         <span className="text-sm font-semibold text-gray-900">
-                          {app.collab?.brand?.display_name ?? 'Marca'}
+                          {app.collab?.brand?.brand_name ?? 'Marca'}
                         </span>
                         <Badge variant={APP_STATUS[app.status].variant} size="sm">
                           {APP_STATUS[app.status].label}
@@ -227,7 +232,7 @@ export default function CreatorDashboard() {
                       </div>
                       <div className="text-xs text-gray-500 truncate">{app.collab?.title ?? '—'}</div>
                       <div className="text-xs text-gray-400 mt-0.5">
-                        {app.collab?.type}{app.collab?.budget ? ` · ${app.collab.budget}€` : ''}
+                        {app.collab?.collab_type}{app.collab?.budget_min ? ` · ${app.collab.budget_min}€` : ''}
                       </div>
                     </div>
                     {app.status === 'accepted' && (

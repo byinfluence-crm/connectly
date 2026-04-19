@@ -1,12 +1,12 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Avatar from '@/components/ui/Avatar';
 import { useCredits } from '@/lib/hooks/useCredits';
 import { useAuth } from '@/components/AuthProvider';
-import { applyToCollab } from '@/lib/supabase';
+import { applyToCollaboration, getPublicCollaborations, type PublicCollaboration } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import {
   Search, SlidersHorizontal, Star, Shield, Zap, MapPin,
@@ -134,49 +134,30 @@ const UGC_CREATORS = [
   },
 ];
 
-/* ─── MOCK DATA — COLLABS ──────────────────────────────────────────────── */
-const COLLABS = [
-  {
-    id: 1, uuid: 'c1a2b3c4-0001-0000-0000-000000000001',
-    brand: 'Casa Nova', title: 'Foodie para reels de nueva carta de primavera', niche: 'Gastronomía',
-    city: 'Sevilla', type: 'Canje', budget: null, boosted: true, applicants: 7, deadline: '30 abr',
-    cover: 'https://picsum.photos/seed/restaurant-nova/600/400',
-    logo: '', description: 'Renovamos carta y buscamos creador gastronómico local.',
-    email: 'hola@casanova.es', web: 'casanova.es',
-  },
-  {
-    id: 2, uuid: 'c1a2b3c4-0002-0000-0000-000000000002',
-    brand: 'Gymfit Studio', title: 'Campaña de lanzamiento de nuestra app de fitness', niche: 'Fitness',
-    city: 'Madrid', type: 'Pago', budget: 300, boosted: false, applicants: 12, deadline: '15 may',
-    cover: 'https://picsum.photos/seed/gym-studio/600/400',
-    logo: '', description: 'Lanzamos app con 50K usuarios. Buscamos cara del movimiento.',
-    email: 'marketing@gymfit.es', web: 'gymfit.es',
-  },
-  {
-    id: 3, uuid: 'c1a2b3c4-0003-0000-0000-000000000003',
-    brand: 'Krave Clothing', title: 'Colección PV · buscamos perfil de moda urbana', niche: 'Moda',
-    city: 'Barcelona', type: 'Ambos', budget: 200, boosted: true, applicants: 19, deadline: '20 abr',
-    cover: 'https://picsum.photos/seed/krave-clothing/600/400',
-    logo: '', description: 'Colección primavera-verano. Pago + ropa valorada en 300€.',
-    email: 'collabs@kraveclothing.com', web: 'kraveclothing.com',
-  },
-  {
-    id: 4, uuid: 'c1a2b3c4-0004-0000-0000-000000000004',
-    brand: 'SkinGlow', title: 'Embajadora para nueva gama de hidratantes premium', niche: 'Belleza',
-    city: 'Remoto', type: 'Pago', budget: 250, boosted: true, applicants: 28, deadline: '25 abr',
-    cover: 'https://picsum.photos/seed/skinglow-beauty/600/400',
-    logo: '', description: 'Gama premium. 3 publicaciones + stories. Envío de producto incluido.',
-    email: 'embajadoras@skinglow.es', web: 'skinglow.es',
-  },
-  {
-    id: 5, uuid: 'c1a2b3c4-0005-0000-0000-000000000005',
-    brand: 'Naturalia Bio', title: 'Embajadores de bienestar para línea eco', niche: 'Bienestar',
-    city: 'Remoto', type: 'Pago', budget: 150, boosted: false, applicants: 5, deadline: '10 may',
-    cover: 'https://picsum.photos/seed/naturalia-eco/600/400',
-    logo: '', description: 'Productos 100% ecológicos. Buscamos perfil auténtico y comprometido.',
-    email: 'equipo@naturaliabio.com', web: 'naturaliabio.com',
-  },
-];
+/* ─── COLABORACIONES — AHORA DATOS REALES DESDE SUPABASE ──────────────── */
+
+const COLLAB_TYPE_LABELS: Record<string, string> = {
+  canje: 'Canje',
+  pago: 'Pago',
+  mixto: 'Canje + Pago',
+};
+
+function collabBudgetLabel(c: PublicCollaboration): string {
+  if (c.collab_type === 'canje') return 'Canje';
+  if (!c.budget_min && !c.budget_max) return 'A convenir';
+  if (c.budget_min && c.budget_max && c.budget_min === c.budget_max) return `${c.budget_min}€`;
+  if (c.budget_min && c.budget_max) return `${c.budget_min}-${c.budget_max}€`;
+  return `${c.budget_min ?? c.budget_max}€`;
+}
+
+function fmtDeadline(d: string | null): string {
+  if (!d) return 'sin fecha';
+  return new Date(d).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+}
+
+function collabCoverSeed(id: string): string {
+  return `https://picsum.photos/seed/collab-${id.slice(0, 8)}/600/400`;
+}
 
 const NICHES = ['Todos', 'Gastronomía', 'Moda', 'Fitness', 'Viajes', 'Bienestar', 'Tecnología', 'Belleza'];
 const CITIES = ['Todas', 'Madrid', 'Barcelona', 'Sevilla', 'Valencia', 'Málaga'];
@@ -488,14 +469,18 @@ function UgcCreatorCard({
 }
 
 /* ─── APPLY MODAL ──────────────────────────────────────────────────────── */
-function ApplyModal({ collab, userId, onClose, onApplied }: { collab: typeof COLLABS[0]; userId: string; onClose: () => void; onApplied: () => void }) {
+function ApplyModal({ collab, userId, onClose, onApplied }: { collab: PublicCollaboration; userId: string; onClose: () => void; onApplied: () => void }) {
   const [message, setMessage] = useState('');
   const [state, setState] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
 
+  const brandName = collab.brand?.brand_name ?? 'Marca';
+  const typeLabel = COLLAB_TYPE_LABELS[collab.collab_type] ?? collab.collab_type;
+  const budgetStr = collabBudgetLabel(collab);
+
   const handleApply = async () => {
     setState('loading');
-    const result = await applyToCollab(userId, collab.uuid, message || undefined);
+    const result = await applyToCollaboration(userId, collab.id, message || undefined);
     if (result.success) {
       setState('ok');
       setTimeout(() => { onApplied(); onClose(); }, 1400);
@@ -504,6 +489,7 @@ function ApplyModal({ collab, userId, onClose, onApplied }: { collab: typeof COL
       setErrorMsg(
         result.error_code === 'already_applied' ? 'Ya has aplicado a esta colaboración' :
         result.error_code === 'collab_not_found' ? 'Colaboración no disponible' :
+        result.error_code === 'creator_profile_not_found' ? 'Tu perfil de creador no está configurado aún' :
         'No se pudo enviar la solicitud. Inténtalo de nuevo.'
       );
     }
@@ -514,11 +500,11 @@ function ApplyModal({ collab, userId, onClose, onApplied }: { collab: typeof COL
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       <div className="relative bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="relative h-36 overflow-hidden">
-          <img src={collab.cover} alt="" className="w-full h-full object-cover scale-105" />
+          <img src={collabCoverSeed(collab.id)} alt="" className="w-full h-full object-cover scale-105" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
           <div className="absolute bottom-3 left-4">
-            <div className="text-white font-bold text-sm">{collab.brand}</div>
-            <div className="text-white/70 text-xs">{collab.city}</div>
+            <div className="text-white font-bold text-sm">{brandName}</div>
+            <div className="text-white/70 text-xs">{collab.city ?? '—'}</div>
           </div>
           <button onClick={onClose} className="absolute top-3 right-3 w-7 h-7 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/50 transition-colors text-lg leading-none">×</button>
         </div>
@@ -534,10 +520,10 @@ function ApplyModal({ collab, userId, onClose, onApplied }: { collab: typeof COL
               <div className="mb-1">
                 <div className="font-bold text-gray-900 text-base leading-snug">{collab.title}</div>
                 <div className="flex items-center gap-2 mt-1 text-xs text-gray-400">
-                  <span className={`font-semibold px-2 py-0.5 rounded-full ${collab.type === 'Pago' ? 'bg-emerald-100 text-emerald-700' : collab.type === 'Canje' ? 'bg-amber-100 text-amber-700' : 'bg-violet-100 text-violet-700'}`}>
-                    {collab.type}{collab.budget ? ` · ${collab.budget}€` : ''}
+                  <span className={`font-semibold px-2 py-0.5 rounded-full ${collab.collab_type === 'pago' ? 'bg-emerald-100 text-emerald-700' : collab.collab_type === 'canje' ? 'bg-amber-100 text-amber-700' : 'bg-violet-100 text-violet-700'}`}>
+                    {typeLabel}{collab.collab_type !== 'canje' && budgetStr !== 'A convenir' ? ` · ${budgetStr}` : ''}
                   </span>
-                  <span>Hasta {collab.deadline}</span>
+                  <span>Hasta {fmtDeadline(collab.deadline)}</span>
                 </div>
               </div>
               <div className="my-4">
@@ -546,7 +532,6 @@ function ApplyModal({ collab, userId, onClose, onApplied }: { collab: typeof COL
               </div>
               {state === 'error' && <div className="bg-red-50 border border-red-100 rounded-xl px-3 py-2.5 text-sm text-red-600 mb-3">{errorMsg}</div>}
               <Button fullWidth size="md" loading={state === 'loading'} onClick={handleApply}><Send size={15} /> Enviar solicitud</Button>
-              <p className="text-center text-xs text-gray-400 mt-2">{collab.applicants} personas ya han aplicado</p>
             </>
           )}
         </div>
@@ -556,7 +541,7 @@ function ApplyModal({ collab, userId, onClose, onApplied }: { collab: typeof COL
 }
 
 /* ─── COLLAB CARD ──────────────────────────────────────────────────────── */
-function CollabCard({ c, userId, userType }: { c: typeof COLLABS[0]; userId: string | null; userType: string | null }) {
+function CollabCard({ c, userId, userType }: { c: PublicCollaboration; userId: string | null; userType: string | null }) {
   const router = useRouter();
   const [showModal, setShowModal] = useState(false);
   const [applied, setApplied] = useState(false);
@@ -568,35 +553,38 @@ function CollabCard({ c, userId, userType }: { c: typeof COLLABS[0]; userId: str
   };
 
   const isBrand = userType === 'brand';
+  const brandName = c.brand?.brand_name ?? 'Marca';
+  const typeLabel = COLLAB_TYPE_LABELS[c.collab_type] ?? c.collab_type;
+  const budgetStr = collabBudgetLabel(c);
 
   return (
     <>
-      <div className={`group bg-white rounded-2xl overflow-hidden border transition-all duration-200 hover:shadow-xl hover:-translate-y-0.5 cursor-pointer ${c.boosted ? 'border-violet-300 ring-2 ring-violet-100 shadow-md' : 'border-gray-100 shadow-sm'}`}>
+      <div className={`group bg-white rounded-2xl overflow-hidden border transition-all duration-200 hover:shadow-xl hover:-translate-y-0.5 cursor-pointer ${c.is_boosted ? 'border-violet-300 ring-2 ring-violet-100 shadow-md' : 'border-gray-100 shadow-sm'}`}>
         <div className="relative h-36 sm:h-40 overflow-hidden bg-gray-100">
-          <img src={c.cover} alt={c.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+          <img src={c.brand?.logo_url ?? collabCoverSeed(c.id)} alt={c.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
           <div className="absolute top-3 left-3 flex gap-1.5">
-            {c.boosted && <span className="flex items-center gap-1 bg-violet-600 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-lg"><Flame size={10} fill="white" /> Destacado</span>}
+            {c.is_boosted && <span className="flex items-center gap-1 bg-violet-600 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-lg"><Flame size={10} fill="white" /> Destacado</span>}
           </div>
           <div className="absolute top-3 right-3">
-            <span className={`text-xs font-bold px-2.5 py-1 rounded-full shadow-md ${c.type === 'Pago' ? 'bg-emerald-500 text-white' : c.type === 'Canje' ? 'bg-amber-500 text-white' : 'bg-violet-600 text-white'}`}>
-              {c.type}{c.budget ? ` · ${c.budget}€` : ''}
+            <span className={`text-xs font-bold px-2.5 py-1 rounded-full shadow-md ${c.collab_type === 'pago' ? 'bg-emerald-500 text-white' : c.collab_type === 'canje' ? 'bg-amber-500 text-white' : 'bg-violet-600 text-white'}`}>
+              {typeLabel}{c.collab_type !== 'canje' && budgetStr !== 'A convenir' ? ` · ${budgetStr}` : ''}
             </span>
           </div>
           <div className="absolute bottom-3 left-3 right-3 flex items-center gap-2">
-            <Avatar name={c.brand} size="sm" className="border-2 border-white shadow" />
+            <Avatar name={brandName} size="sm" className="border-2 border-white shadow" />
             <div>
-              <div className="text-xs font-bold text-white">{c.brand}</div>
-              <div className="flex items-center gap-1 text-xs text-white/70"><MapPin size={9} />{c.city}</div>
+              <div className="text-xs font-bold text-white">{brandName}</div>
+              <div className="flex items-center gap-1 text-xs text-white/70"><MapPin size={9} />{c.city ?? '—'}</div>
             </div>
           </div>
         </div>
         <div className="p-4">
           <div className="text-sm font-semibold text-gray-900 leading-snug mb-2 line-clamp-2">{c.title}</div>
-          <p className="text-xs text-gray-400 line-clamp-1 mb-3">{c.description}</p>
+          {c.description && <p className="text-xs text-gray-400 line-clamp-1 mb-3">{c.description}</p>}
           <div className="flex items-center justify-between mb-3 text-xs text-gray-400">
-            <span className="flex items-center gap-1"><Users size={11} />{applied ? c.applicants + 1 : c.applicants} solicitudes</span>
-            <span>Hasta {c.deadline}</span>
+            <span className="flex items-center gap-1"><Users size={11} />{c.niches_required?.[0] ?? '—'}</span>
+            <span>Hasta {fmtDeadline(c.deadline)}</span>
           </div>
           {applied ? (
             <div className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-semibold"><CheckCircle size={13} /> Solicitud enviada</div>
@@ -624,6 +612,20 @@ export default function DiscoverPage() {
   const userType = (user?.user_metadata?.user_type as string | undefined) ?? null;
   const { credits, loading: unlocking, unlock, persistedUnlocked } = useCredits(user?.id ?? null);
 
+  // Colaboraciones reales desde Supabase
+  const [collabs, setCollabs] = useState<PublicCollaboration[]>([]);
+  const [loadingCollabs, setLoadingCollabs] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingCollabs(true);
+    getPublicCollaborations()
+      .then(data => { if (!cancelled) setCollabs(data); })
+      .catch(console.error)
+      .finally(() => { if (!cancelled) setLoadingCollabs(false); });
+    return () => { cancelled = true; };
+  }, []);
+
   const isUnlocked = (infId: number) => persistedUnlocked.has(String(infId));
 
   const handleUnlock = async (id: string) => {
@@ -647,10 +649,12 @@ export default function DiscoverPage() {
     return matchNiche && matchCity && matchQ;
   });
 
-  const filteredCollabs = COLLABS.filter(c => {
-    const matchNiche = niche === 'Todos' || c.niche === niche;
-    const matchCity = city === 'Todas' || c.city === city || c.city === 'Remoto';
-    const matchQ = !query || c.title.toLowerCase().includes(query.toLowerCase()) || c.brand.toLowerCase().includes(query.toLowerCase());
+  const filteredCollabs = collabs.filter(c => {
+    const matchNiche = niche === 'Todos' || c.niches_required?.includes(niche);
+    const matchCity = city === 'Todas' || c.city === city || !c.city;
+    const matchQ = !query
+      || c.title.toLowerCase().includes(query.toLowerCase())
+      || (c.brand?.brand_name?.toLowerCase().includes(query.toLowerCase()) ?? false);
     return matchNiche && matchCity && matchQ;
   });
 
@@ -838,15 +842,26 @@ export default function DiscoverPage() {
                 )}
               </section>
             </div>
+          ) : loadingCollabs ? (
+            <div className="text-center py-16">
+              <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+              <div className="text-sm text-gray-500">Cargando colaboraciones...</div>
+            </div>
+          ) : filteredCollabs.length === 0 ? (
+            <div className="text-center py-16">
+              <div className="text-3xl mb-3">📭</div>
+              <div className="text-sm font-semibold text-gray-700">No hay colaboraciones abiertas</div>
+              <div className="text-xs text-gray-400 mt-1">Prueba con otros filtros o vuelve pronto</div>
+            </div>
           ) : (
             <div>
-              {filteredCollabs.filter(c => c.boosted).length > 0 && (
+              {filteredCollabs.filter(c => c.is_boosted).length > 0 && (
                 <section className="mb-10">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-base font-bold text-gray-900 flex items-center gap-2"><Flame size={16} className="text-orange-500" /> Colaboraciones destacadas</h2>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredCollabs.filter(c => c.boosted).map(c => <CollabCard key={c.id} c={c} userId={user?.id ?? null} userType={userType} />)}
+                    {filteredCollabs.filter(c => c.is_boosted).map(c => <CollabCard key={c.id} c={c} userId={user?.id ?? null} userType={userType} />)}
                   </div>
                 </section>
               )}
@@ -856,7 +871,7 @@ export default function DiscoverPage() {
                   <span className="text-gray-400 font-normal text-sm ml-2">{filteredCollabs.length} abiertas</span>
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {filteredCollabs.filter(c => !c.boosted).map(c => <CollabCard key={c.id} c={c} userId={user?.id ?? null} userType={userType} />)}
+                  {filteredCollabs.filter(c => !c.is_boosted).map(c => <CollabCard key={c.id} c={c} userId={user?.id ?? null} userType={userType} />)}
                 </div>
               </section>
             </div>

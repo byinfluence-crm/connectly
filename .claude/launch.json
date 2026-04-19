@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "connectly",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "-p", "3777"],
+      "port": 3777,
+      "cwd": "/Users/diegotorotello/Desktop/connectly"
+    }
+  ]
+}

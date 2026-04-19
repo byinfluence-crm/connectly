@@ -2,23 +2,16 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, MoreHorizontal, Users, Eye, Clock, FileText } from 'lucide-react';
+import { Plus, MoreHorizontal, Clock, FileText } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
-import { supabase } from '@/lib/supabase';
+import {
+  getCollaborationsByBrand,
+  updateCollaborationStatus,
+  deleteCollaboration,
+  type Collaboration,
+} from '@/lib/supabase';
 
 type CollabStatus = 'active' | 'draft' | 'closed';
-
-interface Collab {
-  id: string;
-  title: string;
-  type: string;
-  niche: string;
-  city: string;
-  budget: number | null;
-  deadline: string;
-  status: CollabStatus;
-  created_at: string;
-}
 
 const STATUS_CONFIG: Record<CollabStatus, { label: string; color: string }> = {
   active: { label: 'Activa', color: 'bg-emerald-100 text-emerald-700' },
@@ -26,15 +19,29 @@ const STATUS_CONFIG: Record<CollabStatus, { label: string; color: string }> = {
   closed: { label: 'Cerrada', color: 'bg-red-50 text-red-600' },
 };
 
-function fmt(deadline: string) {
+const TYPE_LABELS: Record<string, string> = {
+  canje: 'Canje',
+  pago: 'Pago',
+  mixto: 'Canje + Pago',
+};
+
+function fmt(deadline: string | null) {
+  if (!deadline) return 'sin fecha';
   const d = new Date(deadline);
   return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+}
+
+function budgetLabel(c: Collaboration): string | null {
+  if (!c.budget_min && !c.budget_max) return null;
+  if (c.budget_min && c.budget_max && c.budget_min === c.budget_max) return `${c.budget_min}€`;
+  if (c.budget_min && c.budget_max) return `${c.budget_min}-${c.budget_max}€`;
+  return `${c.budget_min ?? c.budget_max}€`;
 }
 
 export default function CollabsPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [collabs, setCollabs] = useState<Collab[]>([]);
+  const [collabs, setCollabs] = useState<Collaboration[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<CollabStatus | 'all'>('all');
 
@@ -44,30 +51,34 @@ export default function CollabsPage() {
 
   useEffect(() => {
     if (!user?.id) return;
-    supabase
-      .from('collabs')
-      .select('id, title, type, niche, city, budget, deadline, status, created_at')
-      .eq('brand_id', user.id)
-      .order('created_at', { ascending: false })
-      .then(({ data }) => {
-        setCollabs((data ?? []) as Collab[]);
-        setLoading(false);
-      });
+    getCollaborationsByBrand(user.id)
+      .then(setCollabs)
+      .catch(console.error)
+      .finally(() => setLoading(false));
   }, [user?.id]);
 
   const handleStatusChange = async (id: string, status: CollabStatus) => {
-    await supabase.from('collabs').update({ status }).eq('id', id);
-    setCollabs(cs => cs.map(c => c.id === id ? { ...c, status } : c));
+    try {
+      await updateCollaborationStatus(id, status);
+      setCollabs(cs => cs.map(c => c.id === id ? { ...c, status } : c));
+    } catch (err) {
+      console.error('Error updating status:', err);
+    }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('¿Eliminar esta colaboración?')) return;
-    await supabase.from('collabs').delete().eq('id', id);
-    setCollabs(cs => cs.filter(c => c.id !== id));
+    try {
+      await deleteCollaboration(id);
+      setCollabs(cs => cs.filter(c => c.id !== id));
+    } catch (err) {
+      console.error('Error deleting:', err);
+    }
   };
 
-  const filtered = filter === 'all' ? collabs : collabs.filter(c => c.status === filter);
-  const displayName = (user?.user_metadata?.display_name as string) ?? 'Mi Marca';
+  const filtered = filter === 'all'
+    ? collabs
+    : collabs.filter(c => c.status === filter);
 
   if (authLoading || loading) {
     return (
@@ -120,7 +131,10 @@ export default function CollabsPage() {
         ) : (
           <div className="space-y-3">
             {filtered.map(c => {
-              const cfg = STATUS_CONFIG[c.status];
+              const status = c.status as CollabStatus;
+              const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.draft;
+              const budget = budgetLabel(c);
+              const niche = c.niches_required?.[0] ?? '—';
               return (
                 <div key={c.id} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
                   <div className="flex items-start gap-3">
@@ -128,18 +142,18 @@ export default function CollabsPage() {
                       <div className="flex items-center gap-2 flex-wrap mb-1">
                         <span className="text-sm font-bold text-gray-900 truncate">{c.title}</span>
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${cfg.color}`}>{cfg.label}</span>
-                        {c.budget && (
+                        {budget && (
                           <span className="text-xs text-violet-700 font-semibold bg-violet-50 px-2 py-0.5 rounded-full">
-                            {c.budget}€
+                            {budget}
                           </span>
                         )}
                       </div>
                       <div className="flex items-center gap-3 text-xs text-gray-400 flex-wrap">
-                        <span>{c.niche}</span>
+                        <span>{niche}</span>
                         <span>·</span>
-                        <span>{c.city}</span>
+                        <span>{c.city ?? '—'}</span>
                         <span>·</span>
-                        <span className="capitalize">{c.type}</span>
+                        <span>{TYPE_LABELS[c.collab_type] ?? c.collab_type}</span>
                         <span>·</span>
                         <span className="flex items-center gap-1"><Clock size={11} /> Hasta {fmt(c.deadline)}</span>
                       </div>
@@ -147,7 +161,7 @@ export default function CollabsPage() {
 
                     {/* Acciones */}
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      {c.status === 'draft' && (
+                      {status === 'draft' && (
                         <button
                           onClick={() => handleStatusChange(c.id, 'active')}
                           className="text-xs px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 font-semibold hover:bg-emerald-100 transition-colors"
@@ -155,7 +169,7 @@ export default function CollabsPage() {
                           Publicar
                         </button>
                       )}
-                      {c.status === 'active' && (
+                      {status === 'active' && (
                         <button
                           onClick={() => handleStatusChange(c.id, 'closed')}
                           className="text-xs px-3 py-1.5 rounded-xl bg-gray-50 text-gray-600 font-semibold hover:bg-gray-100 transition-colors"

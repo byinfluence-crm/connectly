@@ -295,7 +295,7 @@ export default function BrandDashboard() {
                           {app.creator?.city && (
                             <span className="flex items-center gap-0.5"><MapPin size={10} />{app.creator.city}</span>
                           )}
-                          {app.creator?.niche && <span>{app.creator.niche}</span>}
+                          {app.creator?.niches?.[0] && <span>{app.creator.niches[0]}</span>}
                         </div>
                         <div className="text-xs text-gray-400">
                           Para: <span className="text-gray-600 font-medium">{app.collab?.title ?? '—'}</span>
@@ -310,8 +310,8 @@ export default function BrandDashboard() {
 
                     {app.status === 'pending' && (
                       <div className="flex gap-2 mt-3 pt-3 border-t border-gray-50">
-                        {app.influencer_profile_id && (
-                          <Link href={`/creators/${app.influencer_profile_id}`} className="flex-shrink-0">
+                        {app.creator?.user_id && (
+                          <Link href={`/creators/${app.creator.user_id}`} className="flex-shrink-0">
                             <button className="flex items-center justify-center gap-1 px-3 py-2 rounded-xl bg-gray-50 text-gray-600 text-xs font-semibold hover:bg-gray-100 transition-colors">
                               <Star size={13} /> Ver perfil
                             </button>
@@ -333,8 +333,8 @@ export default function BrandDashboard() {
                     )}
                     {app.status === 'accepted' && (
                       <div className="flex gap-2 mt-3 pt-3 border-t border-gray-50">
-                        {app.influencer_profile_id && (
-                          <Link href={`/creators/${app.influencer_profile_id}`} className="flex-shrink-0">
+                        {app.creator?.user_id && (
+                          <Link href={`/creators/${app.creator.user_id}`} className="flex-shrink-0">
                             <button className="flex items-center justify-center gap-1 px-3 py-2 rounded-xl bg-gray-50 text-gray-600 text-xs font-semibold hover:bg-gray-100 transition-colors">
                               <Star size={13} /> Ver perfil
                             </button>

@@ -10,14 +10,28 @@ import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import { useAuth } from '@/components/AuthProvider';
 import { getPublicProfile, getBrandActiveCollabs, getReviewsForBrand } from '@/lib/supabase';
-import type { PublicProfile, Review } from '@/lib/supabase';
+import type { PublicProfile, Review, PublicCollaboration } from '@/lib/supabase';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type Collab = {
-  id: string; title: string; type: string; budget: number | null;
-  niche: string; city: string; deadline: string; is_boosted: boolean;
+const TYPE_LABELS: Record<string, string> = {
+  canje: 'Canje',
+  pago: 'Pago',
+  mixto: 'Canje + Pago',
 };
+
+function budgetLabel(c: PublicCollaboration): string {
+  if (c.collab_type === 'canje') return 'Canje';
+  if (!c.budget_min && !c.budget_max) return 'A convenir';
+  if (c.budget_min && c.budget_max && c.budget_min === c.budget_max) return `${c.budget_min}€`;
+  if (c.budget_min && c.budget_max) return `${c.budget_min}-${c.budget_max}€`;
+  return `${c.budget_min ?? c.budget_max}€`;
+}
+
+function fmtDate(d: string | null): string {
+  if (!d) return 'sin fecha';
+  return new Date(d).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+}
 
 // ─── Mock reviews ────────────────────────────────────────────────────────────
 
@@ -53,12 +67,6 @@ function Stars({ rating }: { rating: number }) {
   );
 }
 
-function formatBudget(budget: number | null, type: string) {
-  if (type === 'Canje') return 'Canje';
-  if (!budget) return 'A convenir';
-  return `${budget}€`;
-}
-
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function BrandProfilePage() {
@@ -67,7 +75,7 @@ export default function BrandProfilePage() {
   const router = useRouter();
 
   const [profile, setProfile] = useState<PublicProfile | null>(null);
-  const [collabs, setCollabs] = useState<Collab[]>([]);
+  const [collabs, setCollabs] = useState<PublicCollaboration[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -264,19 +272,19 @@ export default function BrandProfilePage() {
                           </span>
                         )}
                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                          c.type === 'Pago' ? 'bg-emerald-50 text-emerald-700' :
-                          c.type === 'Canje' ? 'bg-amber-50 text-amber-700' :
+                          c.collab_type === 'pago' ? 'bg-emerald-50 text-emerald-700' :
+                          c.collab_type === 'canje' ? 'bg-amber-50 text-amber-700' :
                           'bg-violet-50 text-violet-700'
                         }`}>
-                          {c.type}
+                          {TYPE_LABELS[c.collab_type] ?? c.collab_type}
                         </span>
                       </div>
                       <div className="text-sm font-semibold text-gray-900 leading-snug">{c.title}</div>
                       <div className="flex items-center gap-3 mt-1.5 flex-wrap text-xs text-gray-400">
-                        <span className="flex items-center gap-0.5"><Tag size={10} /> {c.niche}</span>
-                        <span className="flex items-center gap-0.5"><MapPin size={10} /> {c.city}</span>
-                        <span className="flex items-center gap-0.5"><Calendar size={10} /> Hasta {c.deadline}</span>
-                        <span className="flex items-center gap-0.5"><Wallet size={10} /> {formatBudget(c.budget, c.type)}</span>
+                        <span className="flex items-center gap-0.5"><Tag size={10} /> {c.niches_required?.[0] ?? '—'}</span>
+                        <span className="flex items-center gap-0.5"><MapPin size={10} /> {c.city ?? '—'}</span>
+                        <span className="flex items-center gap-0.5"><Calendar size={10} /> Hasta {fmtDate(c.deadline)}</span>
+                        <span className="flex items-center gap-0.5"><Wallet size={10} /> {budgetLabel(c)}</span>
                       </div>
                     </div>
                     {(isCreator || isGuest) && (

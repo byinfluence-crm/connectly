@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
-import { supabase } from '@/lib/supabase';
+import { createCollaboration } from '@/lib/supabase';
 
 const NICHES = ['Moda', 'Belleza', 'Fitness', 'Gastronomía', 'Viajes', 'Tecnología', 'Lifestyle', 'Gaming', 'Música', 'Deporte', 'Bienestar', 'Familia', 'Mascotas', 'Arte', 'Humor'];
 const CITIES = ['Madrid', 'Barcelona', 'Valencia', 'Sevilla', 'Bilbao', 'Málaga', 'Zaragoza', 'Murcia', 'Online / España entera'];
@@ -36,22 +36,31 @@ export default function NewCollabPage() {
     setSaving(true);
     setError('');
 
-    const { error: err } = await supabase.from('collabs').insert({
-      brand_id: user.id,
-      title: form.title.trim(),
-      description: form.description.trim() || null,
-      type: form.type,
-      niche: form.niche,
-      city: form.city,
-      budget: form.budget ? parseInt(form.budget) : null,
-      deadline: form.deadline,
-      requirements: form.requirements.trim() || null,
-      status,
-    });
+    try {
+      const budget = form.budget ? parseInt(form.budget) : undefined;
+      // Mapeo "ambos" (UI) → "mixto" (DB enum)
+      const collabType: 'canje' | 'pago' | 'mixto' =
+        form.type === 'ambos' ? 'mixto' : (form.type as 'canje' | 'pago');
 
-    setSaving(false);
-    if (err) { setError(err.message); return; }
-    router.push('/dashboard/brand/collabs');
+      await createCollaboration(user.id, {
+        title: form.title.trim(),
+        description: form.description.trim() || undefined,
+        collab_type: collabType,
+        budget_min: budget,
+        budget_max: budget,
+        niches_required: [form.niche],
+        city: form.city,
+        deadline: form.deadline,
+        requirements: form.requirements.trim() || undefined,
+        status,
+      });
+
+      router.push('/dashboard/brand/collabs');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al crear la colaboración');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
