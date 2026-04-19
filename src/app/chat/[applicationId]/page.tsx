@@ -106,11 +106,12 @@ export default function ChatPage() {
 
   if (!appInfo) return null;
 
-  const isCreator = user?.id === appInfo.influencer_profile_id;
+  // El usuario es creador si su auth.uid coincide con el user_id del influencer_profile
+  const isCreator = user?.id === appInfo.creator?.user_id;
   const otherName = isCreator
-    ? (appInfo.brand as { display_name: string } | null)?.display_name ?? 'Marca'
-    : (appInfo.creator as { display_name: string } | null)?.display_name ?? 'Creador';
-  const collabTitle = (appInfo.collab as { title: string } | null)?.title ?? '';
+    ? appInfo.brand?.display_name ?? 'Marca'
+    : appInfo.creator?.display_name ?? 'Creador';
+  const collabTitle = appInfo.collab?.title ?? '';
 
   // Agrupar mensajes por fecha
   const grouped: { date: string; msgs: typeof messages }[] = [];
@@ -194,9 +195,9 @@ export default function ChatPage() {
                 </div>
 
                 {msgs.map((msg, i) => {
-                  const isMine = msg.sender_id === user?.id;
+                  const isMine = msg.sender_user_id === user?.id;
                   const prevMsg = msgs[i - 1];
-                  const sameSender = prevMsg?.sender_id === msg.sender_id;
+                  const sameSender = prevMsg?.sender_user_id === msg.sender_user_id;
 
                   return (
                     <div
@@ -214,7 +215,7 @@ export default function ChatPage() {
                           {msg.content}
                         </div>
                         {/* Hora — solo en el último mensaje del grupo */}
-                        {(i === msgs.length - 1 || msgs[i + 1]?.sender_id !== msg.sender_id) && (
+                        {(i === msgs.length - 1 || msgs[i + 1]?.sender_user_id !== msg.sender_user_id) && (
                           <span className="text-[10px] text-gray-400 mt-1 px-1">
                             {formatTime(msg.created_at)}
                           </span>

@@ -545,35 +545,111 @@ export async function getApplicationById(appId: string): Promise<{
 
 export interface Message {
   id: string;
-  application_id: string;
-  sender_id: string;
+  conversation_id: string;
+  sender_user_id: string;
   content: string;
+  attachment_url: string | null;
+  is_read: boolean;
   created_at: string;
 }
 
-/** Historial de mensajes de una aplicación. */
+/**
+ * Resuelve o crea la conversación asociada a una aplicación aceptada.
+ * La conversación conecta collaboration + influencer_profile + brand_profile.
+ * Devuelve null si la aplicación no existe o no se pudo resolver el brand_profile.
+ */
+export async function getOrCreateConversationForApplication(
+  applicationId: string,
+): Promise<string | null> {
+  // 1. Leer la aplicación
+  const { data: app, error: appErr } = await supabase
+    .from('collab_applications')
+    .select('collaboration_id, influencer_profile_id, brand_id')
+    .eq('id', applicationId)
+    .maybeSingle();
+  if (appErr || !app) return null;
+
+  // 2. Resolver brand_profile_id desde brand_id (que es marketplace_users.id)
+  const { data: brand } = await supabase
+    .from('brand_profiles')
+    .select('id')
+    .eq('user_id', app.brand_id)
+    .maybeSingle();
+  if (!brand) return null;
+
+  // 3. Buscar conversación existente con los 3 IDs
+  const { data: existing } = await supabase
+    .from('conversations')
+    .select('id')
+    .eq('collaboration_id', app.collaboration_id)
+    .eq('influencer_profile_id', app.influencer_profile_id)
+    .eq('brand_profile_id', brand.id)
+    .maybeSingle();
+  if (existing) return existing.id as string;
+
+  // 4. Crear nueva conversación
+  const { data: created, error } = await supabase
+    .from('conversations')
+    .insert({
+      collaboration_id: app.collaboration_id,
+      influencer_profile_id: app.influencer_profile_id,
+      brand_profile_id: brand.id,
+    })
+    .select('id')
+    .single();
+  if (error) {
+    console.error('Error creating conversation:', error);
+    return null;
+  }
+  return created.id as string;
+}
+
+/** Historial de mensajes de una aplicación (resuelve conversation internamente). */
 export async function getMessages(applicationId: string): Promise<Message[]> {
+  const convId = await getOrCreateConversationForApplication(applicationId);
+  if (!convId) return [];
+
   const { data, error } = await supabase
     .from('messages')
-    .select('id, application_id, sender_id, content, created_at')
-    .eq('application_id', applicationId)
+    .select('id, conversation_id, sender_user_id, content, attachment_url, is_read, created_at')
+    .eq('conversation_id', convId)
     .order('created_at', { ascending: true });
   if (error) throw error;
   return (data ?? []) as Message[];
 }
 
-/** Envía un mensaje. Lanza error si el contenido contiene un teléfono. */
+/**
+ * Devuelve el conversation_id asociado a una aplicación (para usar con Realtime).
+ * Se crea automáticamente si no existe.
+ */
+export async function getConversationIdByApplication(
+  applicationId: string,
+): Promise<string | null> {
+  return getOrCreateConversationForApplication(applicationId);
+}
+
+/** Envía un mensaje al chat de una aplicación. */
 export async function sendMessage(
   applicationId: string,
   senderId: string,
   content: string,
 ): Promise<Message> {
+  const convId = await getOrCreateConversationForApplication(applicationId);
+  if (!convId) throw new Error('No se pudo obtener la conversación');
+
   const { data, error } = await supabase
     .from('messages')
-    .insert({ application_id: applicationId, sender_id: senderId, content })
-    .select()
+    .insert({ conversation_id: convId, sender_user_id: senderId, content })
+    .select('id, conversation_id, sender_user_id, content, attachment_url, is_read, created_at')
     .single();
   if (error) throw error;
+
+  // Actualizar timestamp de última actividad de la conversación
+  await supabase
+    .from('conversations')
+    .update({ last_message_at: new Date().toISOString() })
+    .eq('id', convId);
+
   return data as Message;
 }
 

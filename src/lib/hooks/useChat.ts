@@ -1,6 +1,8 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase, getMessages, sendMessage } from '@/lib/supabase';
+import {
+  supabase, getMessages, sendMessage, getConversationIdByApplication,
+} from '@/lib/supabase';
 import type { Message } from '@/lib/supabase';
 
 // ─── Detección de contenido bloqueado ────────────────────────────────────────
@@ -98,33 +100,50 @@ export const containsPhone = containsBlockedContent;
 
 export function useChat(applicationId: string, userId: string) {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  // Cargar historial inicial
+  // Resolver conversation_id y cargar historial inicial
   useEffect(() => {
     if (!applicationId) return;
+    let cancelled = false;
     setLoading(true);
-    getMessages(applicationId)
-      .then(setMessages)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+
+    (async () => {
+      try {
+        const convId = await getConversationIdByApplication(applicationId);
+        if (cancelled) return;
+        setConversationId(convId);
+
+        if (convId) {
+          const msgs = await getMessages(applicationId);
+          if (!cancelled) setMessages(msgs);
+        }
+      } catch (err) {
+        console.error('useChat load error:', err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
   }, [applicationId]);
 
-  // Suscripción Realtime
+  // Suscripción Realtime — solo cuando tenemos conversationId
   useEffect(() => {
-    if (!applicationId) return;
+    if (!conversationId) return;
 
     const channel = supabase
-      .channel(`chat:${applicationId}`)
+      .channel(`chat:${conversationId}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'messages',
-          filter: `application_id=eq.${applicationId}`,
+          filter: `conversation_id=eq.${conversationId}`,
         },
         payload => {
           const msg = payload.new as Message;
@@ -137,7 +156,7 @@ export function useChat(applicationId: string, userId: string) {
 
     channelRef.current = channel;
     return () => { supabase.removeChannel(channel); };
-  }, [applicationId]);
+  }, [conversationId]);
 
   const send = useCallback(async (content: string): Promise<{ blocked?: boolean }> => {
     if (!content.trim()) return {};
