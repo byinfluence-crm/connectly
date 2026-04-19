@@ -714,6 +714,72 @@ export async function getUgcDeliveries(projectId: string): Promise<UgcDelivery[]
   return (data ?? []) as UgcDelivery[];
 }
 
+// ─── Escrow & Invoices (client-side — solo lectura, sin service role) ─────────
+
+export interface EscrowPayment {
+  id: string;
+  payer_user_id: string;
+  payee_user_id: string;
+  ugc_project_id: string | null;
+  collab_id: string | null;
+  gross_amount_cents: number;
+  platform_fee_cents: number;
+  net_amount_cents: number;
+  status: 'held' | 'released' | 'disputed' | 'refunded_partial';
+  stripe_payment_id: string | null;
+  held_at: string;
+  released_at: string | null;
+  transfer_reference: string | null;
+  created_at: string;
+}
+
+export interface Invoice {
+  id: string;
+  invoice_number: string;
+  user_id: string;
+  escrow_id: string | null;
+  type: 'charge' | 'payout';
+  amount_cents: number;
+  tax_rate: number;
+  tax_amount_cents: number | null;
+  total_cents: number | null;
+  pdf_url: string | null;
+  issued_at: string;
+}
+
+export async function getEscrowsByUser(userId: string): Promise<EscrowPayment[]> {
+  const { data } = await supabase
+    .from('escrow_payments')
+    .select('*')
+    .or(`payer_user_id.eq.${userId},payee_user_id.eq.${userId}`)
+    .order('created_at', { ascending: false });
+  return (data ?? []) as EscrowPayment[];
+}
+
+export async function getInvoicesByUser(userId: string): Promise<Invoice[]> {
+  const { data } = await supabase
+    .from('invoices')
+    .select('*')
+    .eq('user_id', userId)
+    .order('issued_at', { ascending: false });
+  return (data ?? []) as Invoice[];
+}
+
+export async function getCreatorConnectStatus(userId: string): Promise<{
+  stripe_connect_id: string | null;
+  stripe_connect_onboarded: boolean;
+}> {
+  const { data } = await supabase
+    .from('marketplace_users')
+    .select('stripe_connect_id, stripe_connect_onboarded')
+    .eq('id', userId)
+    .single();
+  return {
+    stripe_connect_id: (data as { stripe_connect_id: string | null } | null)?.stripe_connect_id ?? null,
+    stripe_connect_onboarded: (data as { stripe_connect_onboarded: boolean } | null)?.stripe_connect_onboarded ?? false,
+  };
+}
+
 /** Analytics agregados de la marca: alcance total, colaboraciones, top influencers. */
 export async function getBrandAnalytics(brandId: string) {
   const { data } = await supabase

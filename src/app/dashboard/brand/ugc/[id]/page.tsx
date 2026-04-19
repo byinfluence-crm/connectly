@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import {
   CheckCircle, Clock, Video, Camera, Film, Image,
-  ExternalLink, AlertCircle, RotateCcw, Send,
+  ExternalLink, AlertCircle, RotateCcw, Send, CreditCard,
 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { getUgcProject, updateUgcProjectStatus, getUgcDeliveries } from '@/lib/supabase';
@@ -146,6 +146,7 @@ export default function UgcProjectPage() {
   const [deliveries, setDeliveries] = useState<UgcDelivery[]>([]);
   const [loading, setLoading] = useState(true);
   const [transitioning, setTransitioning] = useState(false);
+  const [paying, setPaying] = useState(false);
 
   const userType = (user?.user_metadata?.user_type as string | undefined) ?? null;
   const isBrand = userType === 'brand';
@@ -160,6 +161,30 @@ export default function UgcProjectPage() {
       setDeliveries(dels);
     }).finally(() => setLoading(false));
   }, [params.id]);
+
+  const handlePayment = async () => {
+    if (!project?.creator_id || !project.budget_cents || !user?.id) return;
+    setPaying(true);
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          payer_user_id: user.id,
+          payee_user_id: project.creator_id,
+          amount_cents: project.budget_cents,
+          project_type: 'ugc',
+          project_id: project.id,
+        }),
+      });
+      const { url, error } = await res.json() as { url?: string; error?: string };
+      if (url) window.location.href = url;
+      else { console.error(error); setPaying(false); }
+    } catch (e) {
+      console.error(e);
+      setPaying(false);
+    }
+  };
 
   const handleTransition = async (next: UgcProjectStatus) => {
     if (!project) return;
@@ -234,6 +259,28 @@ export default function UgcProjectPage() {
                 </button>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Pago del proyecto */}
+        {isBrand && project.status === 'accepted' && project.budget_cents && project.creator_id && (
+          <div className="bg-white rounded-2xl border border-violet-200 shadow-sm p-5">
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">Pago del proyecto</h3>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <div className="text-sm text-gray-600">Presupuesto acordado</div>
+                <div className="text-2xl font-bold text-gray-900">{(project.budget_cents / 100).toFixed(2)} €</div>
+                <div className="text-xs text-gray-400 mt-0.5">El pago se retiene en escrow 7 días tras la aprobación</div>
+              </div>
+            </div>
+            <button
+              onClick={handlePayment}
+              disabled={paying}
+              className="w-full py-3 rounded-xl bg-violet-600 text-white text-sm font-bold hover:bg-violet-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              <CreditCard size={15} />
+              {paying ? 'Redirigiendo a Stripe...' : 'Pagar proyecto'}
+            </button>
           </div>
         )}
 
