@@ -83,19 +83,50 @@ export interface PublicProfile {
   display_name: string;
   city: string | null;
   niche: string | null;
+  /** Verificación: se trae del profile específico (brand_profiles o influencer_profiles) */
   is_verified: boolean;
+  /** Perfil destacado — por ahora siempre false, se activará cuando añadamos planes */
   is_boosted: boolean;
   created_at: string;
 }
 
-/** Perfil público de cualquier usuario (datos básicos de marketplace_users). */
+/** Perfil público de cualquier usuario (une marketplace_users + profile específico). */
 export async function getPublicProfile(userId: string): Promise<PublicProfile | null> {
-  const { data } = await supabase
+  const { data: mu, error } = await supabase
     .from('marketplace_users')
-    .select('id, user_type, display_name, city, niche, is_verified, is_boosted, created_at')
+    .select('id, user_type, display_name, city, niche, created_at')
     .eq('id', userId)
-    .single();
-  return data as PublicProfile | null;
+    .maybeSingle();
+  if (error || !mu) return null;
+
+  // Obtener is_verified del profile específico
+  let isVerified = false;
+  if (mu.user_type === 'brand') {
+    const { data: bp } = await supabase
+      .from('brand_profiles')
+      .select('is_verified')
+      .eq('user_id', userId)
+      .maybeSingle();
+    isVerified = bp?.is_verified ?? false;
+  } else if (mu.user_type === 'influencer') {
+    const { data: ip } = await supabase
+      .from('influencer_profiles')
+      .select('is_verified')
+      .eq('user_id', userId)
+      .maybeSingle();
+    isVerified = ip?.is_verified ?? false;
+  }
+
+  return {
+    id: mu.id,
+    user_type: mu.user_type as 'brand' | 'influencer',
+    display_name: mu.display_name ?? '',
+    city: mu.city,
+    niche: mu.niche,
+    is_verified: isVerified,
+    is_boosted: false,
+    created_at: mu.created_at ?? '',
+  };
 }
 
 // ─── Brand / Influencer Profiles ────────────────────────────────────────────
