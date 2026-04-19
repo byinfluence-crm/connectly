@@ -3,14 +3,14 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  ArrowLeft, TrendingUp, Users, Star, BarChart3, LogOut, ChevronRight,
+  TrendingUp, Users, Star, BarChart3, ChevronRight,
 } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis,
   CartesianGrid, Tooltip, BarChart, Bar,
 } from 'recharts';
 import { useAuth } from '@/components/AuthProvider';
-import { supabase, getBrandAnalytics } from '@/lib/supabase';
+import { getBrandAnalytics } from '@/lib/supabase';
 
 // ─── Mock ─────────────────────────────────────────────────────────────────────
 
@@ -152,24 +152,7 @@ export default function BrandAnalyticsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Top bar */}
-      <div className="bg-white border-b border-gray-100 sticky top-0 z-10 shadow-sm">
-        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center gap-3">
-          <Link href="/dashboard/brand" className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
-            <ArrowLeft size={20} />
-          </Link>
-          <span className="text-sm font-bold text-gray-900 flex-1">Analytics de campaña</span>
-          <button
-            onClick={async () => { await supabase.auth.signOut(); router.push('/'); }}
-            className="p-2 text-gray-400 hover:text-red-500 transition-colors"
-          >
-            <LogOut size={16} />
-          </button>
-        </div>
-      </div>
-
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-8">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-8">
 
         <div>
           <h1 className="text-xl font-bold text-gray-900">Rendimiento de tus campañas</h1>
@@ -299,7 +282,6 @@ export default function BrandAnalyticsPage() {
           </div>
         </div>
 
-      </div>
     </div>
   );
 }

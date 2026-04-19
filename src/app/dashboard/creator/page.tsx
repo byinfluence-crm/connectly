@@ -3,13 +3,13 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  Search, TrendingUp, Clock, CheckCircle, ChevronRight,
-  MapPin, Flame, LogOut, FileText, User, Send, Upload,
+  Clock, CheckCircle, ChevronRight,
+  MapPin, Flame, User, Send, Upload,
 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import { useAuth } from '@/components/AuthProvider';
-import { supabase, getApplicationsByCreator } from '@/lib/supabase';
+import { getApplicationsByCreator } from '@/lib/supabase';
 import type { ApplicationWithCollab } from '@/lib/supabase';
 import DeliveryModal from '@/components/DeliveryModal';
 
@@ -61,67 +61,6 @@ const APP_STATUS = {
   rejected: { label: 'Rechazada', variant: 'danger' as const },
 };
 
-/* ─── SIDEBAR ───────────────────────────────────────────────────── */
-function Sidebar({ displayName, userId, onLogout }: { displayName: string; userId: string | undefined; onLogout: () => void }) {
-  return (
-    <aside className="hidden lg:flex flex-col w-60 bg-white border-r border-gray-100 min-h-screen fixed top-0 left-0">
-      <div className="h-16 flex items-center px-6 border-b border-gray-100">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center">
-            <span className="text-white font-bold text-xs">C</span>
-          </div>
-          <span className="font-bold text-gray-900 tracking-tight">Connectly</span>
-        </Link>
-      </div>
-
-      <nav className="flex-1 px-3 py-4 space-y-0.5">
-        <NavItem href="/dashboard/creator" icon={<TrendingUp size={16} />} label="Inicio" active />
-        <NavItem href="/discover" icon={<Search size={16} />} label="Buscar colaboraciones" />
-        <NavItem href="/dashboard/creator/applications" icon={<FileText size={16} />} label="Mis aplicaciones" badge={2} />
-        <NavItem href="/dashboard/creator/analytics" icon={<TrendingUp size={16} />} label="Mis analytics" />
-        <NavItem href={userId ? `/creators/${userId}` : '/discover'} icon={<User size={16} />} label="Mi perfil público" />
-      </nav>
-
-      <div className="px-4 py-4 border-t border-gray-100">
-        <div className="flex items-center gap-2.5 mb-3">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center text-white text-xs font-bold">
-            {displayName.charAt(0).toUpperCase()}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-xs font-semibold text-gray-900 truncate">{displayName}</div>
-            <div className="text-xs text-gray-400">Creador</div>
-          </div>
-        </div>
-        <button
-          onClick={onLogout}
-          className="flex items-center gap-2 text-xs text-red-500 hover:text-red-700 transition-colors w-full px-2 py-1.5 rounded-lg hover:bg-red-50"
-        >
-          <LogOut size={13} /> Cerrar sesión
-        </button>
-      </div>
-    </aside>
-  );
-}
-
-function NavItem({
-  href, icon, label, active, badge,
-}: { href: string; icon: React.ReactNode; label: string; active?: boolean; badge?: number }) {
-  return (
-    <Link
-      href={href}
-      className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
-        active ? 'bg-violet-50 text-violet-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-      }`}
-    >
-      <span className={active ? 'text-violet-600' : 'text-gray-400'}>{icon}</span>
-      <span className="flex-1">{label}</span>
-      {badge && (
-        <span className="bg-violet-600 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">{badge}</span>
-      )}
-    </Link>
-  );
-}
-
 /* ─── MAIN PAGE ─────────────────────────────────────────────────── */
 export default function CreatorDashboard() {
   const { user } = useAuth();
@@ -131,11 +70,6 @@ export default function CreatorDashboard() {
   const [deliveryApp, setDeliveryApp] = useState<ApplicationWithCollab | null>(null);
 
   const displayName = (user?.user_metadata?.display_name as string) ?? 'Creador';
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/');
-  };
 
   // Cargar aplicaciones reales desde Supabase
   useEffect(() => {
@@ -151,7 +85,7 @@ export default function CreatorDashboard() {
   const pending = applications.filter(a => a.status === 'pending').length;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <>
       {deliveryApp && user && (
         <DeliveryModal
           applicationId={deliveryApp.id}
@@ -168,23 +102,8 @@ export default function CreatorDashboard() {
           }}
         />
       )}
-      <Sidebar displayName={displayName} userId={user?.id} onLogout={handleLogout} />
 
-      <main className="lg:ml-60">
-        {/* Mobile header */}
-        <div className="lg:hidden bg-white border-b border-gray-100 h-14 flex items-center justify-between px-4">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center">
-              <span className="text-white font-bold text-xs">C</span>
-            </div>
-            <span className="font-bold text-gray-900 text-sm">Connectly</span>
-          </Link>
-          <button onClick={handleLogout} className="p-2 text-gray-400 hover:text-red-500 transition-colors">
-            <LogOut size={18} />
-          </button>
-        </div>
-
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-8">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-8">
 
           {/* ── Cabecera ── */}
           <div className="flex items-start justify-between gap-4">
@@ -369,9 +288,8 @@ export default function CreatorDashboard() {
             </div>
           </section>
 
-        </div>
-      </main>
-    </div>
+      </div>
+    </>
   );
 }
 

@@ -2,9 +2,9 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, CheckCircle, XCircle, MessageCircle, Star, LogOut, Users } from 'lucide-react';
+import { CheckCircle, XCircle, MessageCircle, Star, Users } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
-import { supabase, getApplicationsByBrand, updateApplicationStatus } from '@/lib/supabase';
+import { getApplicationsByBrand, updateApplicationStatus } from '@/lib/supabase';
 import type { ApplicationWithCreator } from '@/lib/supabase';
 
 type Filter = 'all' | 'pending' | 'accepted' | 'rejected';
@@ -61,26 +61,10 @@ export default function CandidatesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Top bar */}
-      <div className="bg-white border-b border-gray-100 sticky top-0 z-10 shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 h-14 flex items-center gap-3">
-          <Link href="/dashboard/brand" className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
-            <ArrowLeft size={20} />
-          </Link>
-          <span className="text-sm font-bold text-gray-900 flex-1">
-            Candidatos {apps.length > 0 && <span className="text-gray-400">({apps.length})</span>}
-          </span>
-          <button
-            onClick={async () => { await supabase.auth.signOut(); router.push('/'); }}
-            className="p-2 text-gray-400 hover:text-red-500 transition-colors"
-          >
-            <LogOut size={16} />
-          </button>
-        </div>
-      </div>
-
-      <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
+    <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
+      <h1 className="text-lg font-bold text-gray-900">
+        Candidatos {apps.length > 0 && <span className="text-gray-400 font-normal">({apps.length})</span>}
+      </h1>
 
         {/* Filtros */}
         <div className="flex gap-2 flex-wrap">
@@ -194,7 +178,6 @@ export default function CandidatesPage() {
             })}
           </div>
         )}
-      </div>
     </div>
   );
 }

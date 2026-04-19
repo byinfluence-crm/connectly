@@ -1,8 +1,6 @@
 'use client';
 import { useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, LogOut } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { supabase } from '@/lib/supabase';
 
@@ -56,27 +54,9 @@ export default function NewCollabPage() {
     router.push('/dashboard/brand/collabs');
   };
 
-  const displayName = (user?.user_metadata?.display_name as string) ?? 'Mi Marca';
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Top bar */}
-      <div className="bg-white border-b border-gray-100 sticky top-0 z-10 shadow-sm">
-        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-3">
-          <Link href="/dashboard/brand/collabs" className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
-            <ArrowLeft size={20} />
-          </Link>
-          <span className="text-sm font-bold text-gray-900 flex-1">Nueva colaboración</span>
-          <button
-            onClick={async () => { await supabase.auth.signOut(); router.push('/'); }}
-            className="p-2 text-gray-400 hover:text-red-500 transition-colors"
-          >
-            <LogOut size={16} />
-          </button>
-        </div>
-      </div>
-
-      <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
+    <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+      <h1 className="text-lg font-bold text-gray-900">Nueva colaboración</h1>
 
         {/* Básico */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
@@ -208,7 +188,6 @@ export default function NewCollabPage() {
             {saving ? 'Publicando...' : 'Publicar campaña'}
           </button>
         </div>
-      </div>
     </div>
   );
 }

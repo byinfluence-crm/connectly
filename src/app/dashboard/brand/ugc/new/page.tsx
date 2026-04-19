@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, X, Video, Camera, Film, Image, LogOut } from 'lucide-react';
+import { Plus, X, Video, Camera, Film, Image } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { supabase, createUgcProject } from '@/lib/supabase';
 
@@ -92,30 +92,14 @@ export default function NewUgcProjectPage() {
     }
   };
 
-  const displayName = (user?.user_metadata?.display_name as string) ?? 'Mi Marca';
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Top bar */}
-      <div className="bg-white border-b border-gray-100 sticky top-0 z-10 shadow-sm">
-        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-3">
-          <Link href="/dashboard/brand" className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
-            <ArrowLeft size={20} />
-          </Link>
-          <span className="text-sm font-bold text-gray-900 flex-1">Nuevo proyecto UGC</span>
-          <div className="flex items-center gap-1.5 bg-violet-50 text-violet-700 text-xs font-bold px-2.5 py-1.5 rounded-full">
-            <Video size={12} /> UGC
-          </div>
-          <button
-            onClick={async () => { await supabase.auth.signOut(); router.push('/'); }}
-            className="p-2 text-gray-400 hover:text-red-500 transition-colors"
-          >
-            <LogOut size={16} />
-          </button>
+    <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+      <div className="flex items-center gap-3">
+        <h1 className="text-lg font-bold text-gray-900">Nuevo proyecto UGC</h1>
+        <div className="flex items-center gap-1.5 bg-violet-50 text-violet-700 text-xs font-bold px-2.5 py-1.5 rounded-full">
+          <Video size={12} /> UGC
         </div>
       </div>
-
-      <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
 
         {/* Info banner */}
         <div className="bg-violet-50 border border-violet-200 rounded-2xl p-4 text-sm text-violet-800">
@@ -322,7 +306,6 @@ export default function NewUgcProjectPage() {
             {saving ? 'Publicando...' : 'Publicar briefing'}
           </button>
         </div>
-      </div>
     </div>
   );
 }

@@ -3,11 +3,11 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import {
-  ArrowLeft, CheckCircle, Clock, Video, Camera, Film, Image,
-  ExternalLink, AlertCircle, RotateCcw, Send, LogOut,
+  CheckCircle, Clock, Video, Camera, Film, Image,
+  ExternalLink, AlertCircle, RotateCcw, Send,
 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
-import { supabase, getUgcProject, updateUgcProjectStatus, getUgcDeliveries } from '@/lib/supabase';
+import { getUgcProject, updateUgcProjectStatus, getUgcDeliveries } from '@/lib/supabase';
 import type { UgcProject, UgcProjectStatus, UgcDelivery } from '@/types';
 
 /* ─── 8 estados del flujo UGC ───────────────────────────────────────────── */
@@ -196,27 +196,13 @@ export default function UgcProjectPage() {
   const isFinished = TERMINAL_STATUSES.includes(project.status);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Top bar */}
-      <div className="bg-white border-b border-gray-100 sticky top-0 z-10 shadow-sm">
-        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-3">
-          <Link href="/dashboard/brand" className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
-            <ArrowLeft size={20} />
-          </Link>
-          <span className="text-sm font-bold text-gray-900 flex-1 truncate">{project.title}</span>
-          <div className="flex items-center gap-1.5 bg-violet-50 text-violet-700 text-xs font-bold px-2.5 py-1.5 rounded-full flex-shrink-0">
-            <Video size={12} /> UGC
-          </div>
-          <button
-            onClick={async () => { await supabase.auth.signOut(); router.push('/'); }}
-            className="p-2 text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
-          >
-            <LogOut size={16} />
-          </button>
+    <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
+      <div className="flex items-center gap-3">
+        <h1 className="text-lg font-bold text-gray-900 truncate">{project.title}</h1>
+        <div className="flex items-center gap-1.5 bg-violet-50 text-violet-700 text-xs font-bold px-2.5 py-1.5 rounded-full flex-shrink-0">
+          <Video size={12} /> UGC
         </div>
       </div>
-
-      <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
 
         {/* Stepper */}
         <StepIndicator currentStatus={project.status} />
@@ -374,7 +360,6 @@ export default function UgcProjectPage() {
           )}
         </div>
 
-      </div>
     </div>
   );
 }

@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, ArrowLeft, MoreHorizontal, Users, Eye, Clock, LogOut, FileText } from 'lucide-react';
+import { Plus, MoreHorizontal, Users, Eye, Clock, FileText } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { supabase } from '@/lib/supabase';
 
@@ -78,29 +78,16 @@ export default function CollabsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Top bar */}
-      <div className="bg-white border-b border-gray-100 sticky top-0 z-10 shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 h-14 flex items-center gap-3">
-          <Link href="/dashboard/brand" className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
-            <ArrowLeft size={20} />
-          </Link>
-          <span className="text-sm font-bold text-gray-900 flex-1">Mis colaboraciones</span>
-          <Link href="/dashboard/brand/collabs/new">
-            <button className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-violet-600 text-white text-xs font-bold hover:bg-violet-700 transition-colors">
-              <Plus size={14} /> Nueva
-            </button>
-          </Link>
-          <button
-            onClick={async () => { await supabase.auth.signOut(); router.push('/'); }}
-            className="p-2 text-gray-400 hover:text-red-500 transition-colors"
-          >
-            <LogOut size={16} />
+    <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
+      {/* Page header */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg font-bold text-gray-900">Mis colaboraciones</h1>
+        <Link href="/dashboard/brand/collabs/new">
+          <button className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-violet-600 text-white text-xs font-bold hover:bg-violet-700 transition-colors">
+            <Plus size={14} /> Nueva
           </button>
-        </div>
+        </Link>
       </div>
-
-      <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
 
         {/* Filtros */}
         <div className="flex gap-2">
@@ -201,7 +188,6 @@ export default function CollabsPage() {
             </div>
           </Link>
         )}
-      </div>
     </div>
   );
 }
