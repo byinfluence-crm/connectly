@@ -17,7 +17,7 @@ export default function PrivacyPage() {
         <div className="space-y-8 text-gray-600 text-sm leading-relaxed">
           <section>
             <h2 className="text-base font-bold text-gray-900 mb-2">1. Responsable del tratamiento</h2>
-            <p>Byinfluence S.L. (en adelante, <strong>Connectly</strong>), con domicilio en Sevilla (España) y email de contacto <a href="mailto:hola@connectly.es" className="text-violet-600">hola@connectly.es</a>, es el responsable del tratamiento de los datos personales recogidos a través de connectly.es.</p>
+            <p>Byinfluence S.L. (en adelante, <strong>Connectly</strong>), con domicilio en Sevilla (España) y email de contacto <a href="mailto:hola@connectly-influence.es" className="text-violet-600">hola@connectly-influence.es</a>, es el responsable del tratamiento de los datos personales recogidos a través de connectly-influence.es.</p>
           </section>
 
           <section>
@@ -93,7 +93,7 @@ export default function PrivacyPage() {
               <li><strong>Oposición:</strong> oponerte al tratamiento de tus datos en determinadas circunstancias.</li>
               <li><strong>Limitación:</strong> solicitar la restricción del tratamiento de tus datos.</li>
             </ul>
-            <p className="mt-2">Para ejercer cualquiera de estos derechos, escríbenos a <a href="mailto:hola@connectly.es" className="text-violet-600">hola@connectly.es</a>. Responderemos en un plazo máximo de 30 días.</p>
+            <p className="mt-2">Para ejercer cualquiera de estos derechos, escríbenos a <a href="mailto:hola@connectly-influence.es" className="text-violet-600">hola@connectly-influence.es</a>. Responderemos en un plazo máximo de 30 días.</p>
             <p className="mt-2">También puedes presentar una reclamación ante la <strong>Agencia Española de Protección de Datos</strong> (aepd.es) si consideras que tus derechos no han sido atendidos correctamente.</p>
           </section>
 
@@ -109,7 +109,7 @@ export default function PrivacyPage() {
 
           <section>
             <h2 className="text-base font-bold text-gray-900 mb-2">11. Contacto</h2>
-            <p>Para cualquier consulta sobre privacidad o protección de datos: <a href="mailto:hola@connectly.es" className="text-violet-600">hola@connectly.es</a></p>
+            <p>Para cualquier consulta sobre privacidad o protección de datos: <a href="mailto:hola@connectly-influence.es" className="text-violet-600">hola@connectly-influence.es</a></p>
           </section>
         </div>
       </div>

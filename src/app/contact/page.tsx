@@ -30,13 +30,13 @@ export default function ContactPage() {
         <p className="text-sm text-gray-500 mb-8">Estamos aquí para ayudarte. Respondemos en menos de 24h.</p>
 
         <div className="grid sm:grid-cols-2 gap-3 mb-8">
-          <a href="mailto:hola@connectly.es" className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex items-center gap-3 hover:border-violet-200 transition-colors">
+          <a href="mailto:hola@connectly-influence.es" className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex items-center gap-3 hover:border-violet-200 transition-colors">
             <div className="w-9 h-9 bg-violet-50 rounded-xl flex items-center justify-center flex-shrink-0">
               <Mail size={16} className="text-violet-600" />
             </div>
             <div>
               <div className="text-xs font-bold text-gray-900">Email</div>
-              <div className="text-xs text-violet-600">hola@connectly.es</div>
+              <div className="text-xs text-violet-600">hola@connectly-influence.es</div>
             </div>
           </a>
           <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex items-center gap-3">
@@ -45,7 +45,7 @@ export default function ContactPage() {
             </div>
             <div>
               <div className="text-xs font-bold text-gray-900">Instagram</div>
-              <div className="text-xs text-violet-600">@connectly.es</div>
+              <div className="text-xs text-violet-600">@connectly.influence</div>
             </div>
           </div>
         </div>

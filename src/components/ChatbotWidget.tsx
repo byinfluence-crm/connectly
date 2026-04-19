@@ -300,10 +300,10 @@ export default function ChatbotWidget() {
               </div>
 
               <a
-                href="mailto:hola@connectly.es"
+                href="mailto:hola@connectly-influence.es"
                 className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors font-medium"
               >
-                📧 hola@connectly.es
+                📧 hola@connectly-influence.es
               </a>
             </div>
           )}
@@ -337,7 +337,7 @@ export default function ChatbotWidget() {
               {/* Footer categorías */}
               <div className="px-4 py-4">
                 <a
-                  href="mailto:hola@connectly.es"
+                  href="mailto:hola@connectly-influence.es"
                   className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl bg-gray-50 text-sm text-gray-500 hover:bg-gray-100 transition-colors"
                 >
                   ¿No encuentras tu respuesta? Escríbenos →
@@ -373,7 +373,7 @@ export default function ChatbotWidget() {
                   ← Ver más preguntas
                 </button>
                 <a
-                  href="mailto:hola@connectly.es"
+                  href="mailto:hola@connectly-influence.es"
                   className="flex items-center justify-center w-full py-2.5 rounded-xl bg-gray-50 hover:bg-gray-100 text-sm text-gray-500 transition-colors"
                 >
                   ¿Necesitas más ayuda? Escríbenos

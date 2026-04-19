@@ -107,7 +107,7 @@ export default function TermsPage() {
 
           <section>
             <h2 className="text-base font-bold text-gray-900 mb-2">15. Contacto</h2>
-            <p>Para cualquier consulta sobre estos términos: <a href="mailto:hola@connectly.es" className="text-violet-600 hover:text-violet-700">hola@connectly.es</a></p>
+            <p>Para cualquier consulta sobre estos términos: <a href="mailto:hola@connectly-influence.es" className="text-violet-600 hover:text-violet-700">hola@connectly-influence.es</a></p>
           </section>
         </div>
       </div>

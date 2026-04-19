@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
         },
         business_profile: {
           mcc: '7372', // software services
-          url: 'https://connectly.es',
+          url: 'https://connectly-influence.es',
         },
         metadata: { connectly_user_id: user_id },
       });
