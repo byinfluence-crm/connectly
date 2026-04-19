@@ -2,7 +2,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
-import { createCollaboration } from '@/lib/supabase';
+import { createCollaboration, checkPlanLimit } from '@/lib/supabase';
+import PlanLimitModal from '@/components/PlanLimitModal';
 
 const NICHES = ['Moda', 'Belleza', 'Fitness', 'Gastronomía', 'Viajes', 'Tecnología', 'Lifestyle', 'Gaming', 'Música', 'Deporte', 'Bienestar', 'Familia', 'Mascotas', 'Arte', 'Humor'];
 const CITIES = ['Madrid', 'Barcelona', 'Valencia', 'Sevilla', 'Bilbao', 'Málaga', 'Zaragoza', 'Murcia', 'Online / España entera'];
@@ -23,6 +24,11 @@ export default function NewCollabPage() {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [gate, setGate] = useState<{
+    current?: number;
+    limit?: number;
+    upgradeTo: 'starter' | 'pro';
+  } | null>(null);
 
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
@@ -32,6 +38,19 @@ export default function NewCollabPage() {
     if (!form.niche) { setError('Selecciona un nicho'); return; }
     if (!form.city) { setError('Selecciona una ciudad'); return; }
     if (!form.deadline) { setError('Indica la fecha límite'); return; }
+
+    // Solo validamos límite cuando se publica (draft no cuenta como activa)
+    if (status === 'active') {
+      const check = await checkPlanLimit(user.id, 'create_collab');
+      if (!check.allowed && check.reason === 'max_active_collabs_reached') {
+        setGate({
+          current: check.current,
+          limit: check.limit,
+          upgradeTo: (check.upgrade_to ?? 'starter') as 'starter' | 'pro',
+        });
+        return;
+      }
+    }
 
     setSaving(true);
     setError('');
@@ -65,6 +84,19 @@ export default function NewCollabPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+      {gate && user?.id && (
+        <PlanLimitModal
+          open={true}
+          onClose={() => setGate(null)}
+          userId={user.id}
+          role="brand"
+          reason="max_active_collabs_reached"
+          current={gate.current}
+          limit={gate.limit}
+          upgradeTo={gate.upgradeTo}
+        />
+      )}
+
       <h1 className="text-lg font-bold text-gray-900">Nueva colaboración</h1>
 
         {/* Básico */}

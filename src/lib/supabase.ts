@@ -1129,6 +1129,133 @@ export async function getInvoicesByUser(userId: string): Promise<Invoice[]> {
   return (data ?? []) as Invoice[];
 }
 
+// ─── Subscriptions & Plan Limits ──────────────────────────────────────────────
+
+export type PlanTier = 'free' | 'starter' | 'pro';
+
+export interface UserPlan {
+  plan: PlanTier;
+  status: 'active' | 'past_due' | 'canceled' | 'trialing' | null;
+  trial_end: string | null;
+  cancel_at_period_end: boolean;
+  current_period_end: string | null;
+  stripe_customer_id: string | null;
+}
+
+export interface PlanLimits {
+  plan: PlanTier;
+  role: 'brand' | 'influencer';
+  max_active_collabs: number | null;
+  max_candidates_visible_month: number | null;
+  max_applications_month: number | null;
+  max_unlocks_month: number | null;
+  monthly_credits: number;
+  has_advanced_search: boolean;
+  has_ai_matching: boolean;
+  has_roi_reports: boolean;
+  featured_in_discover: boolean;
+  priority_support: boolean;
+}
+
+export interface PlanCheckResult {
+  allowed: boolean;
+  reason?: string;
+  current?: number;
+  limit?: number;
+  upgrade_to?: 'starter' | 'pro';
+  mode?: 'unlimited' | 'credits';
+}
+
+/** Obtiene plan activo + estado de suscripción para un usuario. */
+export async function getUserPlan(userId: string): Promise<UserPlan> {
+  const { data: user } = await supabase
+    .from('marketplace_users')
+    .select('plan, stripe_customer_id')
+    .eq('id', userId)
+    .maybeSingle();
+
+  const { data: sub } = await supabase
+    .from('subscriptions')
+    .select('status, trial_end, cancel_at_period_end, current_period_end')
+    .eq('user_id', userId)
+    .in('status', ['active', 'trialing', 'past_due'])
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return {
+    plan: (user?.plan ?? 'free') as PlanTier,
+    status: (sub?.status ?? null) as UserPlan['status'],
+    trial_end: sub?.trial_end ?? null,
+    cancel_at_period_end: sub?.cancel_at_period_end ?? false,
+    current_period_end: sub?.current_period_end ?? null,
+    stripe_customer_id: user?.stripe_customer_id ?? null,
+  };
+}
+
+/** Límites de un plan + rol concreto (lectura pública). */
+export async function getPlanLimits(plan: PlanTier, role: 'brand' | 'influencer'): Promise<PlanLimits | null> {
+  const { data } = await supabase
+    .from('plan_limits')
+    .select('*')
+    .eq('plan', plan)
+    .eq('role', role)
+    .maybeSingle();
+  return data as PlanLimits | null;
+}
+
+/** Lista todos los plan_limits (para la tabla de /pricing). */
+export async function listAllPlanLimits(): Promise<PlanLimits[]> {
+  const { data } = await supabase.from('plan_limits').select('*');
+  return (data ?? []) as PlanLimits[];
+}
+
+/**
+ * Comprueba si un usuario puede ejecutar una acción dentro de los límites del plan.
+ * Acciones: 'create_collab' | 'apply_to_collab' | 'unlock_profile' | 'view_candidate'
+ */
+export async function checkPlanLimit(
+  userId: string,
+  action: 'create_collab' | 'apply_to_collab' | 'unlock_profile' | 'view_candidate',
+): Promise<PlanCheckResult> {
+  const { data, error } = await supabase.rpc('check_plan_limit', {
+    p_user_id: userId,
+    p_action: action,
+  });
+  if (error) {
+    console.error('checkPlanLimit error:', error);
+    return { allowed: false, reason: error.message };
+  }
+  return data as PlanCheckResult;
+}
+
+/** Inicia checkout para suscripción. Devuelve URL a la que redirigir. */
+export async function startSubscriptionCheckout(
+  userId: string,
+  plan: 'starter' | 'pro',
+): Promise<string> {
+  const res = await fetch('/api/stripe/subscribe', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id: userId, plan }),
+  });
+  const body = await res.json();
+  if (!res.ok || !body.url) throw new Error(body.error ?? 'Error creando checkout');
+  return body.url as string;
+}
+
+/** Abre el Stripe Customer Portal. Devuelve URL. */
+export async function openBillingPortal(userId: string): Promise<string> {
+  const res = await fetch('/api/stripe/portal', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id: userId }),
+  });
+  const body = await res.json();
+  if (!res.ok || !body.url) throw new Error(body.error ?? 'Error abriendo portal');
+  return body.url as string;
+}
+
 export async function getCreatorConnectStatus(userId: string): Promise<{
   stripe_connect_id: string | null;
   stripe_connect_onboarded: boolean;

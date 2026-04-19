@@ -1,10 +1,26 @@
+'use client';
+import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import { Check, Zap, ArrowRight } from 'lucide-react';
+import { useAuth } from '@/components/AuthProvider';
+import { startSubscriptionCheckout } from '@/lib/supabase';
 
-const PLANS = {
+type Plan = {
+  name: string;
+  price: number;
+  description: string;
+  color: string;
+  badge?: string;
+  features: string[];
+  plan: 'free' | 'starter' | 'pro';
+  highlighted: boolean;
+};
+
+const PLANS: Record<'influencer' | 'brand', Plan[]> = {
   influencer: [
     {
       name: 'Gratis',
@@ -13,47 +29,43 @@ const PLANS = {
       color: 'border-gray-200',
       features: [
         'Perfil público básico',
-        'Recibir hasta 3 propuestas/mes',
-        'Chat con marcas',
+        '3 aplicaciones al mes',
+        'Chat con marcas que te acepten',
         'Badge de verificación básico',
       ],
-      cta: 'Empezar gratis',
-      href: '/register?role=influencer&plan=free',
+      plan: 'free',
       highlighted: false,
     },
     {
       name: 'Starter',
-      price: 5,
-      description: '1 mes gratis al registrarte',
+      price: 4,
+      description: '7 días gratis al activar',
       color: 'border-violet-500 ring-2 ring-violet-500',
       badge: 'Más popular',
       features: [
-        'Perfil completo con portfolio',
-        'Propuestas ilimitadas',
-        'Aparecer en búsquedas destacadas',
+        '15 aplicaciones al mes',
+        'Perfil destacado en el discover',
         'Badge verificado Pro',
-        'Estadísticas de perfil',
-        'Prioridad en el feed',
+        'Analytics básicos',
+        'Prioridad en búsquedas',
       ],
-      cta: 'Empezar con 1 mes gratis',
-      href: '/register?role=influencer&plan=starter',
+      plan: 'starter',
       highlighted: true,
     },
     {
       name: 'Pro',
-      price: 12,
-      description: 'Para creadores serios',
+      price: 9,
+      description: 'Para creadores profesionales',
       color: 'border-gray-200',
       features: [
-        'Todo lo de Starter',
-        'Posición #1 en tu categoría',
-        'Perfil featured en la home',
-        'Análisis avanzado de colaboraciones',
-        'Soporte prioritario',
-        'Badge exclusivo Pro+',
+        'Aplicaciones ilimitadas',
+        '#1 en tu categoría 1 día/mes',
+        'Boost 3 días mensual gratis',
+        'Score Connectly público',
+        'Acceso a campañas exclusivas',
+        'Analytics completos + Score',
       ],
-      cta: 'Empezar con 1 mes gratis',
-      href: '/register?role=influencer&plan=pro',
+      plan: 'pro',
       highlighted: false,
     },
   ],
@@ -65,59 +77,145 @@ const PLANS = {
       color: 'border-gray-200',
       features: [
         '1 colaboración activa',
-        'Búsqueda básica de creadores',
-        'Chat con influencers',
-        'Hasta 5 solicitudes/mes',
+        'Búsqueda básica',
+        '5 candidatos visibles/mes',
+        '20 créditos de bienvenida',
       ],
-      cta: 'Empezar gratis',
-      href: '/register?role=brand&plan=free',
+      plan: 'free',
       highlighted: false,
     },
     {
       name: 'Starter',
-      price: 9,
-      description: '1 mes gratis al registrarte',
+      price: 19,
+      description: '7 días gratis al activar',
       color: 'border-violet-500 ring-2 ring-violet-500',
       badge: 'Más popular',
       features: [
-        'Hasta 5 colaboraciones activas',
+        '5 colaboraciones activas',
+        'Candidatos ilimitados',
+        '100 créditos mensuales',
         'Búsqueda avanzada con filtros',
-        'Acceso a perfiles verificados',
         'Estadísticas de campañas',
-        'Boost básico (3 días/mes)',
-        'Soporte por email',
       ],
-      cta: 'Empezar con 1 mes gratis',
-      href: '/register?role=brand&plan=starter',
+      plan: 'starter',
       highlighted: true,
     },
     {
       name: 'Pro',
-      price: 29,
+      price: 49,
       description: 'Para marcas con volumen',
       color: 'border-gray-200',
       features: [
         'Colaboraciones ilimitadas',
-        'Búsqueda con IA de afinidad',
-        'Acceso a todos los perfiles',
-        'Boosts ilimitados',
-        'Reportes de ROI detallados',
-        'Soporte prioritario + gestor',
+        'Desbloqueos ilimitados',
+        '500 créditos mensuales',
+        'IA de afinidad creador↔campaña',
+        'Reportes de ROI descargables',
+        'Destacado en discover de creadores',
+        'Soporte prioritario < 24h',
       ],
-      cta: 'Empezar con 1 mes gratis',
-      href: '/register?role=brand&plan=pro',
+      plan: 'pro',
       highlighted: false,
     },
   ],
 };
 
-const BOOST_OPTIONS = [
-  { name: 'Boost 3 días', price: 9, desc: 'Tu colaboración en lo alto del feed 3 días' },
-  { name: 'Boost 7 días', price: 19, desc: 'Una semana en posición destacada', popular: true },
-  { name: 'Boost 14 días', price: 35, desc: '2 semanas con badge "Urgente" incluido' },
-];
+function PlanCard({ p, role, user, loadingKey, onSubscribe }: {
+  p: Plan;
+  role: 'influencer' | 'brand';
+  user: { id: string; user_metadata?: { user_type?: string } } | null;
+  loadingKey: string | null;
+  onSubscribe: (plan: 'starter' | 'pro') => void;
+}) {
+  const loading = loadingKey === `${role}-${p.plan}`;
+  const userType = user?.user_metadata?.user_type;
+  const isCurrentRole = userType === (role === 'influencer' ? 'influencer' : 'brand');
+
+  const handleClick = () => {
+    if (p.plan === 'free') return; // CTA gestionado como Link
+    onSubscribe(p.plan);
+  };
+
+  return (
+    <div
+      className={`relative rounded-2xl border-2 p-6 flex flex-col ${p.color} ${p.highlighted ? 'bg-violet-50' : 'bg-white'}`}
+    >
+      {p.badge && (
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+          <Badge variant="primary" size="md">{p.badge}</Badge>
+        </div>
+      )}
+      <div className="mb-5">
+        <div className="text-base font-bold text-gray-900 mb-1">{p.name}</div>
+        <div className="flex items-end gap-1 mb-2">
+          <span className="text-3xl font-bold text-gray-900">
+            {p.price === 0 ? 'Gratis' : `${p.price}€`}
+          </span>
+          {p.price > 0 && <span className="text-gray-400 text-sm mb-1">/mes</span>}
+        </div>
+        <p className="text-xs text-gray-500">{p.description}</p>
+      </div>
+      <ul className="space-y-2.5 flex-1 mb-6">
+        {p.features.map(f => (
+          <li key={f} className="flex items-start gap-2 text-sm text-gray-700">
+            <Check size={15} className="text-violet-500 flex-shrink-0 mt-0.5" />
+            {f}
+          </li>
+        ))}
+      </ul>
+
+      {p.plan === 'free' ? (
+        <Link href={`/register?role=${role}`}>
+          <Button variant={p.highlighted ? 'primary' : 'outline'} fullWidth>
+            Empezar gratis
+          </Button>
+        </Link>
+      ) : !user ? (
+        <Link href={`/register?role=${role}&plan=${p.plan}`}>
+          <Button variant={p.highlighted ? 'primary' : 'outline'} fullWidth>
+            Registrarme y activar
+          </Button>
+        </Link>
+      ) : !isCurrentRole ? (
+        <Button variant="outline" fullWidth disabled>
+          No disponible para tu cuenta
+        </Button>
+      ) : (
+        <Button
+          variant={p.highlighted ? 'primary' : 'outline'}
+          fullWidth
+          loading={loading}
+          onClick={handleClick}
+        >
+          Activar 7 días gratis
+        </Button>
+      )}
+    </div>
+  );
+}
 
 export default function PricingPage() {
+  const { user } = useAuth();
+  const router = useRouter();
+  const [loadingKey, setLoadingKey] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  const handleSubscribe = async (role: 'influencer' | 'brand', plan: 'starter' | 'pro') => {
+    if (!user?.id) {
+      router.push(`/register?role=${role}&plan=${plan}`);
+      return;
+    }
+    setLoadingKey(`${role}-${plan}`);
+    setErr(null);
+    try {
+      const url = await startSubscriptionCheckout(user.id, plan);
+      window.location.href = url;
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Error al iniciar suscripción');
+      setLoadingKey(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
@@ -125,7 +223,6 @@ export default function PricingPage() {
       <div className="pt-28 pb-20 px-4 sm:px-6">
         <div className="max-w-5xl mx-auto">
 
-          {/* Header */}
           <div className="text-center mb-16">
             <Badge variant="primary" size="md" className="mb-4 inline-flex">
               <Zap size={12} className="text-violet-600" />
@@ -135,131 +232,60 @@ export default function PricingPage() {
               Empieza gratis. Escala cuando quieras.
             </h1>
             <p className="text-gray-500 text-lg max-w-xl mx-auto">
-              El primer mes es gratis en todos los planes. Sin tarjeta de crédito.
+              7 días gratis al activar un plan de pago. Cancela cuando quieras.
             </p>
           </div>
 
-          {/* Influencers */}
+          {err && (
+            <div className="max-w-lg mx-auto bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600 mb-8">
+              {err}
+            </div>
+          )}
+
           <div className="mb-16">
             <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
               <span className="text-2xl">✨</span> Para creadores de contenido
             </h2>
             <div className="grid md:grid-cols-3 gap-4">
-              {PLANS.influencer.map((plan) => (
-                <div
-                  key={plan.name}
-                  className={`relative rounded-2xl border-2 p-6 flex flex-col ${plan.color} ${plan.highlighted ? 'bg-violet-50' : 'bg-white'}`}
-                >
-                  {'badge' in plan && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                      <Badge variant="primary" size="md">{plan.badge as string}</Badge>
-                    </div>
-                  )}
-                  <div className="mb-5">
-                    <div className="text-base font-bold text-gray-900 mb-1">{plan.name}</div>
-                    <div className="flex items-end gap-1 mb-2">
-                      <span className="text-3xl font-bold text-gray-900">{plan.price === 0 ? 'Gratis' : `${plan.price}€`}</span>
-                      {plan.price > 0 && <span className="text-gray-400 text-sm mb-1">/mes</span>}
-                    </div>
-                    <p className="text-xs text-gray-500">{plan.description}</p>
-                  </div>
-                  <ul className="space-y-2.5 flex-1 mb-6">
-                    {plan.features.map(f => (
-                      <li key={f} className="flex items-start gap-2 text-sm text-gray-700">
-                        <Check size={15} className="text-violet-500 flex-shrink-0 mt-0.5" />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                  <Link href={plan.href}>
-                    <Button variant={plan.highlighted ? 'primary' : 'outline'} fullWidth>
-                      {plan.cta}
-                    </Button>
-                  </Link>
-                </div>
+              {PLANS.influencer.map(p => (
+                <PlanCard
+                  key={p.name}
+                  p={p}
+                  role="influencer"
+                  user={user}
+                  loadingKey={loadingKey}
+                  onSubscribe={plan => handleSubscribe('influencer', plan)}
+                />
               ))}
             </div>
           </div>
 
-          {/* Marcas */}
           <div className="mb-16">
             <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
               <span className="text-2xl">🏢</span> Para marcas y agencias
             </h2>
             <div className="grid md:grid-cols-3 gap-4">
-              {PLANS.brand.map((plan) => (
-                <div
-                  key={plan.name}
-                  className={`relative rounded-2xl border-2 p-6 flex flex-col ${plan.color} ${plan.highlighted ? 'bg-violet-50' : 'bg-white'}`}
-                >
-                  {'badge' in plan && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                      <Badge variant="primary" size="md">{plan.badge as string}</Badge>
-                    </div>
-                  )}
-                  <div className="mb-5">
-                    <div className="text-base font-bold text-gray-900 mb-1">{plan.name}</div>
-                    <div className="flex items-end gap-1 mb-2">
-                      <span className="text-3xl font-bold text-gray-900">{plan.price === 0 ? 'Gratis' : `${plan.price}€`}</span>
-                      {plan.price > 0 && <span className="text-gray-400 text-sm mb-1">/mes</span>}
-                    </div>
-                    <p className="text-xs text-gray-500">{plan.description}</p>
-                  </div>
-                  <ul className="space-y-2.5 flex-1 mb-6">
-                    {plan.features.map(f => (
-                      <li key={f} className="flex items-start gap-2 text-sm text-gray-700">
-                        <Check size={15} className="text-violet-500 flex-shrink-0 mt-0.5" />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                  <Link href={plan.href}>
-                    <Button variant={plan.highlighted ? 'primary' : 'outline'} fullWidth>
-                      {plan.cta}
-                    </Button>
-                  </Link>
-                </div>
+              {PLANS.brand.map(p => (
+                <PlanCard
+                  key={p.name}
+                  p={p}
+                  role="brand"
+                  user={user}
+                  loadingKey={loadingKey}
+                  onSubscribe={plan => handleSubscribe('brand', plan)}
+                />
               ))}
             </div>
           </div>
 
-          {/* Boost */}
-          <div className="bg-gray-50 rounded-3xl p-8 mb-16">
-            <div className="flex items-center gap-3 mb-2">
-              <Zap size={20} className="text-violet-600" />
-              <h2 className="text-xl font-bold text-gray-900">Boosts puntuales</h2>
-            </div>
-            <p className="text-gray-500 text-sm mb-8 max-w-xl">
-              Disponibles en todos los planes. Actívalos cuando necesites más visibilidad: renovación de carta, lanzamiento de producto, evento puntual.
-            </p>
-            <div className="grid sm:grid-cols-3 gap-4">
-              {BOOST_OPTIONS.map(b => (
-                <div
-                  key={b.name}
-                  className={`bg-white rounded-2xl p-5 border-2 ${b.popular ? 'border-violet-300' : 'border-gray-100'} relative`}
-                >
-                  {b.popular && (
-                    <div className="absolute -top-3 left-4">
-                      <Badge variant="primary" size="sm">Más elegido</Badge>
-                    </div>
-                  )}
-                  <div className="text-2xl font-bold text-gray-900 mb-1">{b.price}€</div>
-                  <div className="text-sm font-semibold text-gray-900 mb-1">{b.name}</div>
-                  <div className="text-xs text-gray-500">{b.desc}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* FAQ */}
           <div className="max-w-2xl mx-auto">
             <h2 className="text-2xl font-bold text-gray-900 mb-8 text-center">Preguntas frecuentes</h2>
             <div className="space-y-6">
               {[
-                { q: '¿Necesito tarjeta de crédito para el mes gratis?', a: 'No. El primer mes no requiere ningún dato de pago. Solo cuando quieras continuar.' },
-                { q: '¿Puedo cambiar de plan en cualquier momento?', a: 'Sí. Puedes subir o bajar de plan cuando quieras. Los cambios aplican en el siguiente ciclo.' },
-                { q: '¿Los boosts se pueden combinar con cualquier plan?', a: 'Sí, los boosts son pagos puntuales disponibles para todos los planes, incluido el gratuito.' },
-                { q: '¿Hay comisión por colaboración cerrada?', a: 'No. Connectly no cobra comisión sobre las colaboraciones. Solo pagas la suscripción.' },
+                { q: '¿Necesito tarjeta de crédito para activar el trial?', a: 'Sí, para el trial de 7 días se solicita la tarjeta. No se cobra nada hasta el día 8 y puedes cancelar antes en cualquier momento.' },
+                { q: '¿Puedo cambiar de plan en cualquier momento?', a: 'Sí. Puedes subir o bajar de plan cuando quieras desde tu dashboard. Los cambios aplican al instante.' },
+                { q: '¿Qué pasa si cancelo?', a: 'Tu plan sigue activo hasta el final del periodo ya pagado. Después vuelves al plan Gratis automáticamente.' },
+                { q: '¿Hay comisión por colaboración cerrada?', a: 'En colaboraciones con pago hay una comisión del 10%. En proyectos UGC es 20%. No hay comisión en canjes simples.' },
               ].map(({ q, a }) => (
                 <div key={q} className="border-b border-gray-100 pb-6">
                   <div className="font-semibold text-gray-900 mb-2">{q}</div>
@@ -269,7 +295,6 @@ export default function PricingPage() {
             </div>
           </div>
 
-          {/* CTA */}
           <div className="text-center mt-20">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">¿Listo para empezar?</h2>
             <Link href="/register">

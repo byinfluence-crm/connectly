@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Search, FileText, Users, BarChart3,
-  Video, User, LogOut, Menu, X,
+  Video, User, LogOut, Menu, X, CreditCard,
 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { supabase, getMarketplaceUser } from '@/lib/supabase';
@@ -19,6 +19,7 @@ const BRAND_NAV: NavItem[] = [
   { label: 'Candidatos', href: '/dashboard/brand/candidates', icon: Users },
   { label: 'Proyectos UGC', href: '/dashboard/brand/ugc', icon: Video },
   { label: 'Analytics', href: '/dashboard/brand/analytics', icon: BarChart3 },
+  { label: 'Facturación', href: '/dashboard/brand/settings/billing', icon: CreditCard },
 ];
 
 const creatorNav = (userId: string): NavItem[] => [
@@ -26,6 +27,7 @@ const creatorNav = (userId: string): NavItem[] => [
   { label: 'Buscar', href: '/discover', icon: Search },
   { label: 'Mis aplicaciones', href: '/dashboard/creator/applications', icon: FileText },
   { label: 'Analytics', href: '/dashboard/creator/analytics', icon: BarChart3 },
+  { label: 'Facturación', href: '/dashboard/creator/settings/billing', icon: CreditCard },
   { label: 'Mi perfil', href: `/creators/${userId}`, icon: User },
 ];
 

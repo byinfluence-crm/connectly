@@ -6,7 +6,8 @@ import Button from '@/components/ui/Button';
 import Avatar from '@/components/ui/Avatar';
 import { useCredits } from '@/lib/hooks/useCredits';
 import { useAuth } from '@/components/AuthProvider';
-import { applyToCollaboration, getPublicCollaborations, type PublicCollaboration } from '@/lib/supabase';
+import { applyToCollaboration, checkPlanLimit, getPublicCollaborations, type PublicCollaboration } from '@/lib/supabase';
+import PlanLimitModal from '@/components/PlanLimitModal';
 import { useRouter } from 'next/navigation';
 import {
   Search, SlidersHorizontal, Star, Shield, Zap, MapPin,
@@ -545,10 +546,23 @@ function CollabCard({ c, userId, userType }: { c: PublicCollaboration; userId: s
   const router = useRouter();
   const [showModal, setShowModal] = useState(false);
   const [applied, setApplied] = useState(false);
+  const [gate, setGate] = useState<{ current?: number; limit?: number; upgradeTo: 'starter' | 'pro' } | null>(null);
 
-  const handleApplyClick = () => {
+  const handleApplyClick = async () => {
     if (!userId) { router.push('/login'); return; }
     if (userType === 'brand') return;
+
+    // Verificar límite de aplicaciones del mes
+    const check = await checkPlanLimit(userId, 'apply_to_collab');
+    if (!check.allowed && check.reason === 'max_applications_month_reached') {
+      setGate({
+        current: check.current,
+        limit: check.limit,
+        upgradeTo: (check.upgrade_to ?? 'starter') as 'starter' | 'pro',
+      });
+      return;
+    }
+
     setShowModal(true);
   };
 
@@ -596,6 +610,18 @@ function CollabCard({ c, userId, userType }: { c: PublicCollaboration; userId: s
         </div>
       </div>
       {showModal && userId && <ApplyModal collab={c} userId={userId} onClose={() => setShowModal(false)} onApplied={() => setApplied(true)} />}
+      {gate && userId && (
+        <PlanLimitModal
+          open={true}
+          onClose={() => setGate(null)}
+          userId={userId}
+          role="influencer"
+          reason="max_applications_month_reached"
+          current={gate.current}
+          limit={gate.limit}
+          upgradeTo={gate.upgradeTo}
+        />
+      )}
     </>
   );
 }
