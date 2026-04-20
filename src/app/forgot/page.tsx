@@ -16,8 +16,11 @@ export default function ForgotPage() {
     setLoading(true);
     setError('');
 
+    // Siempre enviar el link al dominio de producción, nunca a localhost.
+    // Si NEXT_PUBLIC_APP_URL está definida se usa esa, si no cae al origin actual.
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
     const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${appUrl}/reset-password`,
     });
 
     setLoading(false);
