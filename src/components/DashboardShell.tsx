@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Search, FileText, Users, BarChart3,
-  Video, User, LogOut, Menu, X, CreditCard,
+  Video, User, LogOut, Menu, X, CreditCard, Building2,
 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { supabase, getMarketplaceUser } from '@/lib/supabase';
@@ -13,13 +13,19 @@ import { supabase, getMarketplaceUser } from '@/lib/supabase';
 type NavItem = { label: string; href: string; icon: React.ElementType; badge?: number };
 
 const BRAND_NAV: NavItem[] = [
-  { label: 'Inicio', href: '/dashboard/brand', icon: LayoutDashboard },
-  { label: 'Descubrir', href: '/discover', icon: Search },
-  { label: 'Colaboraciones', href: '/dashboard/brand/collabs', icon: FileText },
-  { label: 'Candidatos', href: '/dashboard/brand/candidates', icon: Users },
-  { label: 'Proyectos UGC', href: '/dashboard/brand/ugc', icon: Video },
-  { label: 'Analytics', href: '/dashboard/brand/analytics', icon: BarChart3 },
-  { label: 'Facturación', href: '/dashboard/brand/settings/billing', icon: CreditCard },
+  { label: 'Inicio',         href: '/dashboard/brand',                   icon: LayoutDashboard },
+  { label: 'Descubrir',      href: '/discover',                           icon: Search },
+  { label: 'Colaboraciones', href: '/dashboard/brand/collabs',            icon: FileText },
+  { label: 'Candidatos',     href: '/dashboard/brand/candidates',         icon: Users },
+  { label: 'Proyectos UGC',  href: '/dashboard/brand/ugc',               icon: Video },
+  { label: 'Analytics',      href: '/dashboard/brand/analytics',          icon: BarChart3 },
+  { label: 'Mi perfil',      href: '/dashboard/brand/settings/profile',   icon: User },
+  { label: 'Facturación',    href: '/dashboard/brand/settings/billing',   icon: CreditCard },
+];
+
+const ADMIN_NAV: NavItem[] = [
+  { label: 'Panel de agencia', href: '/dashboard/admin', icon: LayoutDashboard },
+  { label: 'Mis marcas',       href: '/dashboard/admin', icon: Building2 },
 ];
 
 const creatorNav = (userId: string): NavItem[] => [
@@ -35,7 +41,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const { user, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const [userType, setUserType] = useState<'brand' | 'influencer' | null>(null);
+  const [userType, setUserType] = useState<'brand' | 'influencer' | 'superadmin' | null>(null);
   const [displayName, setDisplayName] = useState('');
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -46,11 +52,11 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     setDisplayName(user.user_metadata?.display_name || '');
 
     getMarketplaceUser(user.id)
-      .then(profile => setUserType(profile.user_type as 'brand' | 'influencer'))
+      .then(profile => setUserType(profile.user_type as 'brand' | 'influencer' | 'superadmin'))
       .catch(() => {
-        // Fallback: infer from URL
-        if (pathname.includes('/creator')) setUserType('influencer');
-        else if (pathname.includes('/brand')) setUserType('brand');
+        if (pathname.includes('/admin'))   setUserType('superadmin');
+        else if (pathname.includes('/creator')) setUserType('influencer');
+        else if (pathname.includes('/brand'))   setUserType('brand');
         else router.replace('/login');
       });
   }, [user, loading, router, pathname]);
@@ -69,12 +75,14 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     );
   }
 
-  const navItems = userType === 'influencer'
-    ? creatorNav(user?.id || '')
-    : BRAND_NAV;
+  const navItems = userType === 'superadmin'
+    ? ADMIN_NAV
+    : userType === 'influencer'
+      ? creatorNav(user?.id || '')
+      : BRAND_NAV;
 
-  const roleLabel = userType === 'influencer' ? 'Creador' : 'Marca';
-  const fallbackName = userType === 'influencer' ? 'Creador' : 'Mi Marca';
+  const roleLabel = userType === 'superadmin' ? 'Agencia' : userType === 'influencer' ? 'Creador' : 'Marca';
+  const fallbackName = userType === 'superadmin' ? 'Admin' : userType === 'influencer' ? 'Creador' : 'Mi Marca';
 
   const isActive = (href: string) => {
     if (href === '/discover') return pathname === '/discover';

@@ -34,7 +34,9 @@ export default function LoginPage() {
       const userId = (await supabase.auth.getUser()).data.user?.id;
       if (userId) {
         const profile = await getMarketplaceUser(userId);
-        router.push(profile.user_type === 'influencer' ? '/dashboard/creator' : '/dashboard/brand');
+        if (profile.user_type === 'superadmin') router.push('/dashboard/admin');
+        else if (profile.user_type === 'influencer') router.push('/dashboard/creator');
+        else router.push('/dashboard/brand');
         router.refresh();
         return;
       }

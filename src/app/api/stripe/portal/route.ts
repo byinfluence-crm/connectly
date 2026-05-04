@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { stripe } from '@/lib/stripe';
+import { requireOwnUser } from '@/lib/supabase-server';
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,6 +20,9 @@ export async function POST(req: NextRequest) {
     if (!user_id) {
       return NextResponse.json({ error: 'Falta user_id' }, { status: 400 });
     }
+
+    const auth = await requireOwnUser(req, user_id);
+    if (!auth.authorized) return auth.response;
 
     const { data: user } = await supabaseAdmin
       .from('marketplace_users')

@@ -131,15 +131,31 @@ export async function getPublicProfile(userId: string): Promise<PublicProfile | 
 
 // ─── Brand / Influencer Profiles ────────────────────────────────────────────
 
+export interface BrandLocation {
+  name: string;
+  address: string;
+  city: string;
+  maps_url?: string;
+}
+
 export interface BrandProfile {
   id: string;
   user_id: string;
   brand_name: string;
   logo_url: string | null;
+  cover_photo_url: string | null;
+  gallery_urls: string[];
   sector: string | null;
+  cuisine_type: string | null;
   description: string | null;
+  collab_brief: string | null;
   city: string | null;
   website: string | null;
+  instagram_url: string | null;
+  tiktok_url: string | null;
+  price_range: '€' | '€€' | '€€€' | '€€€€' | null;
+  schedule: string | null;
+  locations: BrandLocation[];
   rating_avg: number;
   total_reviews: number;
   is_verified: boolean;
@@ -148,6 +164,17 @@ export interface BrandProfile {
   fiscal_nif: string | null;
   fiscal_address: string | null;
   billing_email: string | null;
+}
+
+export async function updateBrandProfile(
+  userId: string,
+  data: Partial<Omit<BrandProfile, 'id' | 'user_id' | 'rating_avg' | 'total_reviews' | 'is_verified' | 'is_claimed'>>,
+): Promise<void> {
+  const { error } = await supabase
+    .from('brand_profiles')
+    .update(data)
+    .eq('user_id', userId);
+  if (error) throw error;
 }
 
 export interface InfluencerProfile {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { stripe, calcFees } from '@/lib/stripe';
+import { requireOwnUser } from '@/lib/supabase-server';
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,6 +25,9 @@ export async function POST(req: NextRequest) {
     if (!ugc_project_id && !collab_id) {
       return NextResponse.json({ error: 'Requiere ugc_project_id o collab_id' }, { status: 400 });
     }
+
+    const auth = await requireOwnUser(req, payer_user_id);
+    if (!auth.authorized) return auth.response;
 
     const type = ugc_project_id ? 'ugc' : 'collab';
     const grossCents = Math.round(amount_euros * 100);

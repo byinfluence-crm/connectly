@@ -14,7 +14,9 @@ export default function DashboardPage() {
 
     getMarketplaceUser(user.id)
       .then(profile => {
-        router.replace(profile.user_type === 'influencer' ? '/dashboard/creator' : '/dashboard/brand');
+        if (profile.user_type === 'superadmin') router.replace('/dashboard/admin');
+        else if (profile.user_type === 'influencer') router.replace('/dashboard/creator');
+        else router.replace('/dashboard/brand');
       })
       .catch(() => router.replace('/dashboard/brand'));
   }, [user, loading, router]);
