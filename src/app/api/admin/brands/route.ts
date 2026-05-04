@@ -127,16 +127,17 @@ export async function POST(req: NextRequest) {
   }
 
   // Crear marketplace_users (upsert por si el trigger ya lo creó)
-  await supabaseAdmin.from('marketplace_users').upsert({
+  const { error: muErr } = await supabaseAdmin.from('marketplace_users').upsert({
     id: brandUserId,
     user_type: 'brand',
     display_name: brand_name,
     city: city ?? null,
     credits: 0,
   }, { onConflict: 'id' });
+  if (muErr) return NextResponse.json({ error: `Error creando usuario: ${muErr.message}` }, { status: 500 });
 
   // Crear brand_profiles (upsert por si el trigger ya lo creó)
-  await supabaseAdmin.from('brand_profiles').upsert({
+  const { error: bpErr } = await supabaseAdmin.from('brand_profiles').upsert({
     user_id: brandUserId,
     brand_name,
     sector: sector ?? null,
@@ -144,12 +145,14 @@ export async function POST(req: NextRequest) {
     description: description ?? null,
     website: website ?? null,
   }, { onConflict: 'user_id' });
+  if (bpErr) return NextResponse.json({ error: `Error creando perfil: ${bpErr.message}` }, { status: 500 });
 
   // Vincular marca a la agencia
-  await supabaseAdmin.from('agency_brands').insert({
+  const { error: abErr } = await supabaseAdmin.from('agency_brands').insert({
     agency_id: agency.id,
     brand_user_id: brandUserId,
   });
+  if (abErr) return NextResponse.json({ error: `Error vinculando a la agencia: ${abErr.message}` }, { status: 500 });
 
   return NextResponse.json({
     success: true,
