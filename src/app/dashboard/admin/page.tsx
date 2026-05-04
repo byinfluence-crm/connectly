@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import { useRouter } from 'next/navigation';
 import { getMarketplaceUser } from '@/lib/supabase';
+import { authFetch } from '@/lib/auth-fetch';
 import Link from 'next/link';
 import { Building2, Plus, X, Loader2, Eye, EyeOff, CheckCircle2, AlertCircle, Pencil } from 'lucide-react';
 
@@ -49,7 +50,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!user) return;
-    fetch('/api/admin/brands')
+    authFetch('/api/admin/brands')
       .then(r => r.json())
       .then(d => setBrands(d.brands ?? []))
       .finally(() => setLoadingBrands(false));
@@ -60,7 +61,7 @@ export default function AdminPage() {
     setFormLoading(true);
     setFormError('');
 
-    const res = await fetch('/api/admin/brands', {
+    const res = await authFetch('/api/admin/brands', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form),
@@ -79,7 +80,7 @@ export default function AdminPage() {
     setFormLoading(false);
 
     // Refrescar lista
-    fetch('/api/admin/brands').then(r => r.json()).then(d => setBrands(d.brands ?? []));
+    authFetch('/api/admin/brands').then(r => r.json()).then(d => setBrands(d.brands ?? []));
   };
 
   return (

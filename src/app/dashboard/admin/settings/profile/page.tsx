@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import { Loader2, CheckCircle2, AlertCircle, KeyRound } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { authFetch } from '@/lib/auth-fetch';
 
 export default function AdminProfilePage() {
   const { user } = useAuth();
@@ -20,7 +21,7 @@ export default function AdminProfilePage() {
   useEffect(() => {
     if (!user) return;
     setEmail(user.email ?? '');
-    fetch('/api/admin/profile')
+    authFetch('/api/admin/profile')
       .then(r => r.json())
       .then(d => {
         setDisplayName(d.display_name ?? '');
@@ -34,7 +35,7 @@ export default function AdminProfilePage() {
     setSaving(true);
     setError('');
     try {
-      const res = await fetch('/api/admin/profile', {
+      const res = await authFetch('/api/admin/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ display_name: displayName, agency_name: agencyName }),

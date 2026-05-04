@@ -1,29 +1,24 @@
-import { createServerClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 import type { NextRequest } from 'next/server';
 import type { User } from '@supabase/supabase-js';
 
+// Admin client con service role — verifica tokens JWT sin depender de cookies
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+);
+
 /**
- * Verifica la sesión del usuario desde las cookies del request.
- * Usar en API routes para autenticar quién está llamando.
+ * Extrae y verifica el usuario desde el header Authorization: Bearer <token>.
+ * El cliente envía el token con authFetch (src/lib/auth-fetch.ts).
  */
 export async function getAuthenticatedUser(req: NextRequest): Promise<User | null> {
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return req.cookies.getAll();
-        },
-        setAll() {
-          // Las API routes no necesitan refrescar cookies
-        },
-      },
-    }
-  );
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) return null;
 
-  const { data: { user } } = await supabase.auth.getUser();
-  return user;
+  const token = authHeader.slice(7);
+  const { data: { user } } = await supabaseAdmin.auth.getUser(token);
+  return user ?? null;
 }
 
 /**

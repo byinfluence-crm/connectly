@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
+import { authFetch } from '@/lib/auth-fetch';
 import {
   CheckCircle2, Loader2, AlertCircle, CreditCard,
   Building2, Zap, Users, BarChart3, Shield,
@@ -42,7 +43,7 @@ export default function AdminBillingPage() {
 
   useEffect(() => {
     if (!user) return;
-    fetch('/api/admin/billing')
+    authFetch('/api/admin/billing')
       .then(r => r.json())
       .then(d => setBilling(d))
       .finally(() => setLoading(false));
@@ -52,7 +53,7 @@ export default function AdminBillingPage() {
     setAL(true);
     setError('');
     try {
-      const res = await fetch('/api/admin/billing', {
+      const res = await authFetch('/api/admin/billing', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action }),

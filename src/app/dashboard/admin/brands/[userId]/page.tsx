@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/components/AuthProvider';
+import { authFetch } from '@/lib/auth-fetch';
 import type { BrandLocation } from '@/lib/supabase';
 import {
   ArrowLeft, Camera, Plus, Trash2, MapPin, AtSign, Globe,
@@ -58,7 +59,7 @@ export default function AdminBrandProfilePage() {
 
   useEffect(() => {
     if (!user || !userId) return;
-    fetch(`/api/admin/brands/${userId}/profile`)
+    authFetch(`/api/admin/brands/${userId}/profile`)
       .then(r => r.json())
       .then(({ profile }) => {
         if (!profile) return;
@@ -87,7 +88,7 @@ export default function AdminBrandProfilePage() {
     const fd = new FormData();
     fd.append('file', file);
     fd.append('folder', folder);
-    const res = await fetch(`/api/admin/brands/${userId}/upload`, { method: 'POST', body: fd });
+    const res = await authFetch(`/api/admin/brands/${userId}/upload`, { method: 'POST', body: fd });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? 'Upload failed');
     return data.url as string;
@@ -135,7 +136,7 @@ export default function AdminBrandProfilePage() {
     setSaving(true);
     setError('');
     try {
-      const res = await fetch(`/api/admin/brands/${userId}/profile`, {
+      const res = await authFetch(`/api/admin/brands/${userId}/profile`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
