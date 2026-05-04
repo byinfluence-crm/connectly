@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Search, FileText, Users, BarChart3,
-  Video, User, LogOut, Menu, X, CreditCard, Building2,
+  Video, User, LogOut, Menu, X, CreditCard, Building2, MessageCircle,
 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { supabase, getMarketplaceUser } from '@/lib/supabase';
@@ -17,6 +17,7 @@ const BRAND_NAV: NavItem[] = [
   { label: 'Descubrir',      href: '/discover',                           icon: Search },
   { label: 'Colaboraciones', href: '/dashboard/brand/collabs',            icon: FileText },
   { label: 'Candidatos',     href: '/dashboard/brand/candidates',         icon: Users },
+  { label: 'Mensajes',       href: '/dashboard/brand/messages',           icon: MessageCircle },
   { label: 'Proyectos UGC',  href: '/dashboard/brand/ugc',               icon: Video },
   { label: 'Analytics',      href: '/dashboard/brand/analytics',          icon: BarChart3 },
   { label: 'Mi perfil',      href: '/dashboard/brand/settings/profile',   icon: User },
@@ -31,12 +32,13 @@ const ADMIN_NAV: NavItem[] = [
 ];
 
 const creatorNav = (_userId: string): NavItem[] => [
-  { label: 'Inicio', href: '/dashboard/creator', icon: LayoutDashboard },
-  { label: 'Buscar', href: '/discover', icon: Search },
-  { label: 'Mis aplicaciones', href: '/dashboard/creator/applications', icon: FileText },
-  { label: 'Analytics', href: '/dashboard/creator/analytics', icon: BarChart3 },
-  { label: 'Mi perfil', href: '/dashboard/creator/settings/profile', icon: User },
-  { label: 'Facturación', href: '/dashboard/creator/settings/billing', icon: CreditCard },
+  { label: 'Inicio',          href: '/dashboard/creator',                  icon: LayoutDashboard },
+  { label: 'Buscar',          href: '/discover',                            icon: Search },
+  { label: 'Mis aplicaciones', href: '/dashboard/creator/applications',    icon: FileText },
+  { label: 'Mensajes',        href: '/dashboard/creator/messages',          icon: MessageCircle },
+  { label: 'Analytics',       href: '/dashboard/creator/analytics',         icon: BarChart3 },
+  { label: 'Mi perfil',       href: '/dashboard/creator/settings/profile',  icon: User },
+  { label: 'Facturación',     href: '/dashboard/creator/settings/billing',  icon: CreditCard },
 ];
 
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
