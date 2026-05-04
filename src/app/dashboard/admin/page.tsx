@@ -37,6 +37,7 @@ export default function AdminPage() {
     brand_name: '', email: '', sector: '', city: '', description: '', website: '',
   });
 
+
   useEffect(() => {
     if (loading) return;
     if (!user) { router.replace('/login'); return; }
@@ -158,9 +159,11 @@ export default function AdminPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Email de acceso *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Email de acceso
+                <span className="ml-1.5 text-xs font-normal text-gray-400">(opcional — se genera uno si no lo pones)</span>
+              </label>
               <input
-                required
                 type="email"
                 value={form.email}
                 onChange={e => setForm({ ...form, email: e.target.value })}

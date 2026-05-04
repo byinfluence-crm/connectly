@@ -72,19 +72,23 @@ export async function POST(req: NextRequest) {
   const auth = await requireSuperadmin(req);
   if (!auth.ok) return auth.res;
 
-  const { brand_name, email, sector, city, description, website } =
+  const { brand_name, email: rawEmail, sector, city, description, website } =
     await req.json() as {
       brand_name: string;
-      email: string;
+      email?: string;
       sector?: string;
       city?: string;
       description?: string;
       website?: string;
     };
 
-  if (!brand_name || !email) {
-    return NextResponse.json({ error: 'brand_name y email son obligatorios' }, { status: 400 });
+  if (!brand_name) {
+    return NextResponse.json({ error: 'El nombre de la marca es obligatorio' }, { status: 400 });
   }
+
+  // Si no se proporciona email, generar uno interno no accesible
+  const slug = brand_name.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20);
+  const email = rawEmail?.trim() || `${slug}-${Date.now()}@internal.connectly.app`;
 
   // Obtener la agencia del superadmin
   const { data: agency } = await supabaseAdmin
