@@ -30,13 +30,13 @@ const ADMIN_NAV: NavItem[] = [
   { label: 'Facturación',      href: '/dashboard/admin/settings/billing', icon: CreditCard },
 ];
 
-const creatorNav = (userId: string): NavItem[] => [
+const creatorNav = (_userId: string): NavItem[] => [
   { label: 'Inicio', href: '/dashboard/creator', icon: LayoutDashboard },
   { label: 'Buscar', href: '/discover', icon: Search },
   { label: 'Mis aplicaciones', href: '/dashboard/creator/applications', icon: FileText },
   { label: 'Analytics', href: '/dashboard/creator/analytics', icon: BarChart3 },
+  { label: 'Mi perfil', href: '/dashboard/creator/settings/profile', icon: User },
   { label: 'Facturación', href: '/dashboard/creator/settings/billing', icon: CreditCard },
-  { label: 'Mi perfil', href: `/creators/${userId}`, icon: User },
 ];
 
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
