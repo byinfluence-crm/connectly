@@ -86,7 +86,7 @@ export default function BrandProfilePage() {
     try {
       const url = await uploadImage(file, 'cover');
       setForm(f => ({ ...f, cover_photo_url: url }));
-    } catch { setError('Error subiendo la foto de portada'); }
+    } catch (e) { setError(e instanceof Error ? e.message : 'Error subiendo la foto de portada'); }
     finally { setUploadingCover(false); }
   };
 
@@ -97,7 +97,7 @@ export default function BrandProfilePage() {
     try {
       const urls = await Promise.all(files.map(f => uploadImage(f, 'gallery')));
       setForm(f => ({ ...f, gallery_urls: [...f.gallery_urls, ...urls] }));
-    } catch { setError('Error subiendo fotos a la galería'); }
+    } catch (e) { setError(e instanceof Error ? e.message : 'Error subiendo fotos a la galería'); }
     finally { setUploadingGallery(false); }
   };
 
@@ -276,7 +276,10 @@ export default function BrandProfilePage() {
                 <>
                   <img src={form.cover_photo_url} alt="Portada" className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                    <Camera size={24} className="text-white" />
+                    {uploadingCover
+                      ? <Loader2 size={24} className="text-white animate-spin" />
+                      : <Camera size={24} className="text-white" />
+                    }
                   </div>
                 </>
               ) : (
