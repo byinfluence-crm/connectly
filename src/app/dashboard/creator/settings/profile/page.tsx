@@ -65,7 +65,13 @@ export default function CreatorProfilePage() {
     authFetch('/api/creator/profile')
       .then(r => r.json())
       .then(d => {
-        setProfile(d.profile ?? {
+        const p = d.profile;
+        setProfile(p ? {
+          ...p,
+          niches: p.niches ?? [],          // null-safe: DB puede devolver null
+          followers_ig: p.followers_ig ?? 0,
+          followers_tt: p.followers_tt ?? 0,
+        } : {
           display_name: user.user_metadata?.display_name ?? '',
           bio: null,
           avatar_url: null,
@@ -84,6 +90,7 @@ export default function CreatorProfilePage() {
           billing_email: null,
         });
       })
+      .catch(() => setError('No se pudo cargar el perfil. Recarga la página.'))
       .finally(() => setLoading(false));
   }, [user]);
 
@@ -92,21 +99,24 @@ export default function CreatorProfilePage() {
     setSaving(true);
     setError('');
     setSaved(false);
-
-    const res = await authFetch('/api/creator/profile', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(profile),
-    });
-    const data = await res.json();
-
-    if (!res.ok) {
-      setError(data.error ?? 'Error al guardar');
-    } else {
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
+    try {
+      const res = await authFetch('/api/creator/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profile),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? 'Error al guardar');
+      } else {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
+      }
+    } catch {
+      setError('Error de red. Comprueba tu conexión.');
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
