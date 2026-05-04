@@ -24,8 +24,9 @@ const BRAND_NAV: NavItem[] = [
 ];
 
 const ADMIN_NAV: NavItem[] = [
-  { label: 'Panel de agencia', href: '/dashboard/admin', icon: LayoutDashboard },
-  { label: 'Mis marcas',       href: '/dashboard/admin', icon: Building2 },
+  { label: 'Panel de agencia', href: '/dashboard/admin',                  icon: LayoutDashboard },
+  { label: 'Mis marcas',       href: '/dashboard/admin',                  icon: Building2 },
+  { label: 'Mi perfil',        href: '/dashboard/admin/settings/profile', icon: User },
 ];
 
 const creatorNav = (userId: string): NavItem[] => [
