@@ -5,7 +5,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { authFetch } from '@/lib/auth-fetch';
 import Link from 'next/link';
 import {
-  Loader2, Save, CheckCircle2, AlertCircle, Camera, ExternalLink,
+  Loader2, Save, CheckCircle2, AlertCircle, Camera, ExternalLink, RefreshCw,
 } from 'lucide-react';
 
 interface CreatorProfile {
@@ -25,6 +25,20 @@ interface CreatorProfile {
   fiscal_nif: string | null;
   fiscal_address: string | null;
   billing_email: string | null;
+}
+
+interface SyncStats {
+  ig?: { followers: number; avg_views: number; avg_likes: number; er: number; posts_analyzed: number };
+  tt?: { followers: number; avg_views: number; avg_likes: number; er: number; posts_analyzed: number };
+  ig_error?: string;
+  tt_error?: string;
+  last_sync_at?: string;
+}
+
+function fmtN(n: number) {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+  if (n >= 1_000)     return (n / 1_000).toFixed(1) + 'k';
+  return n.toString();
 }
 
 const NICHES = ['Gastronomía', 'Moda', 'Fitness', 'Viajes', 'Lifestyle', 'Tecnología', 'Belleza', 'Deporte', 'Gaming', 'Otro'];
@@ -59,6 +73,8 @@ export default function CreatorProfilePage() {
   const [error, setError] = useState('');
   const [avatarUploading, setAvatarUploading] = useState(false);
   const avatarRef = useRef<HTMLInputElement>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncStats, setSyncStats] = useState<SyncStats | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -136,6 +152,28 @@ export default function CreatorProfilePage() {
       setError(e instanceof Error ? e.message : 'Error subiendo la foto de perfil');
     } finally {
       setAvatarUploading(false);
+    }
+  };
+
+  const handleSync = async () => {
+    if (!profile) return;
+    setSyncing(true);
+    setError('');
+    try {
+      const res = await authFetch('/api/creator/sync-social', { method: 'POST' });
+      const data: SyncStats & { error?: string } = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Error al sincronizar');
+      setSyncStats(data);
+      // Actualizar seguidores en el form con los datos reales
+      setProfile(p => p ? {
+        ...p,
+        followers_ig: data.ig?.followers ?? p.followers_ig,
+        followers_tt: data.tt?.followers ?? p.followers_tt,
+      } : p);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al sincronizar');
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -327,7 +365,8 @@ export default function CreatorProfilePage() {
 
         {/* Redes sociales */}
         <Section title="Redes sociales">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Handles */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
             <Field label="Instagram">
               <div className="relative">
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm select-none">@</span>
@@ -338,16 +377,6 @@ export default function CreatorProfilePage() {
                   className={`${inputClass} pl-8`}
                 />
               </div>
-            </Field>
-            <Field label="Seguidores Instagram">
-              <input
-                type="number"
-                min={0}
-                value={profile.followers_ig || ''}
-                onChange={e => setProfile({ ...profile, followers_ig: parseInt(e.target.value) || 0 })}
-                placeholder="0"
-                className={inputClass}
-              />
             </Field>
             <Field label="TikTok">
               <div className="relative">
@@ -360,17 +389,81 @@ export default function CreatorProfilePage() {
                 />
               </div>
             </Field>
-            <Field label="Seguidores TikTok">
-              <input
-                type="number"
-                min={0}
-                value={profile.followers_tt || ''}
-                onChange={e => setProfile({ ...profile, followers_tt: parseInt(e.target.value) || 0 })}
-                placeholder="0"
-                className={inputClass}
-              />
-            </Field>
           </div>
+
+          {/* Botón sincronizar */}
+          <button
+            type="button"
+            onClick={handleSync}
+            disabled={syncing || (!profile.instagram_handle && !profile.tiktok_handle)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-violet-200 text-violet-700 text-sm font-medium hover:bg-violet-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors mb-5"
+          >
+            <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
+            {syncing ? 'Sincronizando...' : 'Sincronizar datos reales'}
+          </button>
+
+          {/* Resultados de la sync */}
+          {syncStats && (
+            <div className="space-y-3">
+              {syncStats.ig && (
+                <div className="bg-gradient-to-r from-pink-50 to-orange-50 border border-pink-100 rounded-xl p-4">
+                  <p className="text-xs font-semibold text-pink-700 mb-2">Instagram · {syncStats.ig.posts_analyzed} publicaciones analizadas</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <p className="text-xs text-gray-400">Seguidores</p>
+                      <p className="font-bold text-gray-900">{fmtN(syncStats.ig.followers)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400">Media views</p>
+                      <p className="font-bold text-gray-900">{fmtN(syncStats.ig.avg_views)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400">Engagement</p>
+                      <p className="font-bold text-gray-900">{syncStats.ig.er}%</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {syncStats.ig_error && (
+                <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-xl px-4 py-2.5">
+                  Instagram: {syncStats.ig_error}
+                </p>
+              )}
+              {syncStats.tt && (
+                <div className="bg-gradient-to-r from-gray-50 to-slate-50 border border-gray-100 rounded-xl p-4">
+                  <p className="text-xs font-semibold text-gray-700 mb-2">TikTok · {syncStats.tt.posts_analyzed} vídeos analizados</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <p className="text-xs text-gray-400">Seguidores</p>
+                      <p className="font-bold text-gray-900">{fmtN(syncStats.tt.followers)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400">Media views</p>
+                      <p className="font-bold text-gray-900">{fmtN(syncStats.tt.avg_views)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400">Engagement</p>
+                      <p className="font-bold text-gray-900">{syncStats.tt.er}%</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {syncStats.tt_error && (
+                <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-xl px-4 py-2.5">
+                  TikTok: {syncStats.tt_error}
+                </p>
+              )}
+              {syncStats.last_sync_at && (
+                <p className="text-xs text-gray-400">
+                  Última sincronización: {new Date(syncStats.last_sync_at).toLocaleString('es-ES')}
+                  {' · '}
+                  <button onClick={handleSave} className="text-violet-600 font-medium hover:text-violet-700">
+                    Guardar cambios
+                  </button>
+                </p>
+              )}
+            </div>
+          )}
         </Section>
 
         {/* Tarifas */}
