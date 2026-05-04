@@ -113,13 +113,20 @@ export default function CreatorProfilePage() {
     const file = e.target.files?.[0];
     if (!file || !profile) return;
     setAvatarUploading(true);
-    const fd = new FormData();
-    fd.append('file', file);
-    fd.append('folder', 'avatar');
-    const res = await authFetch('/api/creator/upload', { method: 'POST', body: fd });
-    const data = await res.json();
-    if (data.url) setProfile({ ...profile, avatar_url: data.url });
-    setAvatarUploading(false);
+    setError('');
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('folder', 'avatar');
+      const res = await authFetch('/api/creator/upload', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok || !data.url) throw new Error(data.error ?? 'Error al subir la imagen');
+      setProfile({ ...profile, avatar_url: data.url });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error subiendo la foto de perfil');
+    } finally {
+      setAvatarUploading(false);
+    }
   };
 
   const toggleNiche = (niche: string) => {
@@ -186,7 +193,10 @@ export default function CreatorProfilePage() {
         <Section title="Identidad">
           {/* Avatar */}
           <div className="flex items-center gap-5 mb-5 pb-5 border-b border-gray-100">
-            <div className="relative shrink-0">
+            <div
+              className="relative shrink-0 cursor-pointer group"
+              onClick={() => !avatarUploading && avatarRef.current?.click()}
+            >
               {profile.avatar_url ? (
                 <img
                   src={profile.avatar_url}
@@ -200,16 +210,13 @@ export default function CreatorProfilePage() {
                   </span>
                 </div>
               )}
-              <button
-                onClick={() => avatarRef.current?.click()}
-                disabled={avatarUploading}
-                className="absolute -bottom-2 -right-2 w-7 h-7 bg-violet-600 text-white rounded-full flex items-center justify-center hover:bg-violet-700 transition-colors shadow-sm disabled:opacity-60"
-              >
+              {/* Overlay visible en hover o mientras sube */}
+              <div className={`absolute inset-0 rounded-2xl bg-black/40 flex items-center justify-center transition-opacity ${avatarUploading ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
                 {avatarUploading
-                  ? <Loader2 size={13} className="animate-spin" />
-                  : <Camera size={13} />
+                  ? <Loader2 size={20} className="text-white animate-spin" />
+                  : <Camera size={20} className="text-white" />
                 }
-              </button>
+              </div>
               <input
                 ref={avatarRef}
                 type="file"
@@ -220,11 +227,11 @@ export default function CreatorProfilePage() {
             </div>
             <div>
               <p className="text-sm font-medium text-gray-700">Foto de perfil</p>
-              <p className="text-xs text-gray-400 mt-0.5">JPG o PNG · Máximo 5 MB</p>
+              <p className="text-xs text-gray-400 mt-0.5">JPG o PNG · Máximo 10 MB</p>
               <button
-                onClick={() => avatarRef.current?.click()}
+                onClick={() => !avatarUploading && avatarRef.current?.click()}
                 disabled={avatarUploading}
-                className="text-xs text-violet-600 font-medium mt-2 hover:text-violet-700"
+                className="text-xs text-violet-600 font-medium mt-2 hover:text-violet-700 disabled:opacity-50"
               >
                 {avatarUploading ? 'Subiendo...' : 'Cambiar foto'}
               </button>
