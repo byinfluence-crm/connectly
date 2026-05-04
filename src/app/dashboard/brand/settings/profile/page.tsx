@@ -1,7 +1,8 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/components/AuthProvider';
-import { supabase, getBrandProfileByUserId, updateBrandProfile } from '@/lib/supabase';
+import { getBrandProfileByUserId, updateBrandProfile } from '@/lib/supabase';
+import { authFetch } from '@/lib/auth-fetch';
 import type { BrandProfile, BrandLocation } from '@/lib/supabase';
 import {
   Camera, Plus, Trash2, MapPin, AtSign, Globe,
@@ -12,12 +13,14 @@ const SECTORS     = ['Gastronomía', 'Moda', 'Fitness', 'Viajes', 'Belleza', 'Te
 const PRICE_OPTS  = ['€', '€€', '€€€', '€€€€'] as const;
 const CITIES      = ['Madrid', 'Barcelona', 'Sevilla', 'Valencia', 'Bilbao', 'Málaga', 'Zaragoza', 'Otra'];
 
-async function uploadImage(userId: string, file: File, folder: string): Promise<string> {
-  const ext  = file.name.split('.').pop();
-  const path = `${userId}/${folder}/${Date.now()}.${ext}`;
-  const { error } = await supabase.storage.from('brand-assets').upload(path, file, { upsert: true });
-  if (error) throw error;
-  return supabase.storage.from('brand-assets').getPublicUrl(path).data.publicUrl;
+async function uploadImage(file: File, folder: string): Promise<string> {
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('folder', folder);
+  const res = await authFetch('/api/brand/upload', { method: 'POST', body: fd });
+  const data = await res.json();
+  if (!res.ok || !data.url) throw new Error(data.error ?? 'Error al subir imagen');
+  return data.url as string;
 }
 
 export default function BrandProfilePage() {
@@ -81,7 +84,7 @@ export default function BrandProfilePage() {
     if (!file || !user) return;
     setUploadingCover(true);
     try {
-      const url = await uploadImage(user.id, file, 'cover');
+      const url = await uploadImage(file, 'cover');
       setForm(f => ({ ...f, cover_photo_url: url }));
     } catch { setError('Error subiendo la foto de portada'); }
     finally { setUploadingCover(false); }
@@ -92,7 +95,7 @@ export default function BrandProfilePage() {
     if (!files.length || !user) return;
     setUploadingGallery(true);
     try {
-      const urls = await Promise.all(files.map(f => uploadImage(user.id, f, 'gallery')));
+      const urls = await Promise.all(files.map(f => uploadImage(f, 'gallery')));
       setForm(f => ({ ...f, gallery_urls: [...f.gallery_urls, ...urls] }));
     } catch { setError('Error subiendo fotos a la galería'); }
     finally { setUploadingGallery(false); }
