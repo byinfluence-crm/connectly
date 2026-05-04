@@ -45,7 +45,11 @@ export default function AdminBillingPage() {
     if (!user) return;
     authFetch('/api/admin/billing')
       .then(r => r.json())
-      .then(d => setBilling(d))
+      .then(d => {
+        if (d.error) setError(d.error);
+        else setBilling(d);
+      })
+      .catch(e => setError(e.message ?? 'Error cargando facturación'))
       .finally(() => setLoading(false));
   }, [user]);
 
