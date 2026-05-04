@@ -31,7 +31,7 @@ export default function AdminPage() {
   const [showForm, setShowForm] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [result, setResult] = useState<{ temp_password: string; brand_name: string } | null>(null);
+  const [result, setResult] = useState<{ temp_password: string | null; brand_name: string } | null>(null);
   const [formError, setFormError] = useState('');
   const [form, setForm] = useState({
     brand_name: '', email: '', sector: '', city: '', description: '', website: '',
@@ -75,7 +75,7 @@ export default function AdminPage() {
       return;
     }
 
-    setResult({ temp_password: data.temp_password, brand_name: form.brand_name });
+    setResult({ temp_password: data.temp_password ?? null, brand_name: form.brand_name });
     setForm({ brand_name: '', email: '', sector: '', city: '', description: '', website: '' });
     setShowForm(false);
     setFormLoading(false);
@@ -110,26 +110,34 @@ export default function AdminPage() {
               <p className="font-semibold text-green-800 mb-1">
                 Marca &ldquo;{result.brand_name}&rdquo; creada
               </p>
-              <p className="text-sm text-green-700 mb-3">
-                Comparte estas credenciales con la marca de forma segura. La contraseña solo se muestra una vez.
-              </p>
-              <div className="bg-white rounded-xl border border-green-200 p-4 flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs text-gray-400 mb-0.5">Contraseña temporal</p>
-                  <p className="font-mono text-lg font-bold text-gray-900 tracking-widest">
-                    {showPassword ? result.temp_password : '••••••••••••'}
+              {result.temp_password ? (
+                <>
+                  <p className="text-sm text-green-700 mb-3">
+                    Comparte estas credenciales con la marca de forma segura. La contraseña solo se muestra una vez.
                   </p>
-                </div>
-                <button
-                  onClick={() => setShowPassword(p => !p)}
-                  className="p-2 rounded-lg hover:bg-gray-50 text-gray-500"
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-              <p className="text-xs text-green-600 mt-2">
-                La marca puede cambiar su contraseña en cualquier momento desde /forgot
-              </p>
+                  <div className="bg-white rounded-xl border border-green-200 p-4 flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-xs text-gray-400 mb-0.5">Contraseña temporal</p>
+                      <p className="font-mono text-lg font-bold text-gray-900 tracking-widest">
+                        {showPassword ? result.temp_password : '••••••••••••'}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowPassword(p => !p)}
+                      className="p-2 rounded-lg hover:bg-gray-50 text-gray-500"
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                  <p className="text-xs text-green-600 mt-2">
+                    La marca puede cambiar su contraseña en cualquier momento desde /forgot
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-green-700">
+                  Marca creada sin acceso propio. Puedes editar su perfil desde el panel.
+                </p>
+              )}
             </div>
             <button onClick={() => setResult(null)} className="text-green-500 hover:text-green-700">
               <X size={16} />

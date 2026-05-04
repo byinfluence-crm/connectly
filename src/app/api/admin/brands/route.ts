@@ -86,9 +86,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'El nombre de la marca es obligatorio' }, { status: 400 });
   }
 
-  // Si no se proporciona email, generar uno interno no accesible
-  const slug = brand_name.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20);
-  const email = rawEmail?.trim() || `${slug}-${Date.now()}@internal.connectly.app`;
+  const email = rawEmail?.trim() || '';
 
   // Obtener la agencia del superadmin
   const { data: agency } = await supabaseAdmin
@@ -101,28 +99,34 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No tienes una agencia creada. Ejecuta el SQL de activación.' }, { status: 400 });
   }
 
-  // Generar contraseña temporal
-  const tempPassword = `Brand${Math.floor(100000 + Math.random() * 900000)}!`;
+  let brandUserId: string;
+  let tempPassword: string | null = null;
 
-  // Crear usuario en Supabase Auth
-  const { data: newUser, error: authErr } = await supabaseAdmin.auth.admin.createUser({
-    email,
-    password: tempPassword,
-    email_confirm: true,
-    user_metadata: { display_name: brand_name, user_type: 'brand' },
-  });
+  if (email) {
+    // Con email: crear usuario en Supabase Auth para que la marca pueda acceder
+    tempPassword = `Brand${Math.floor(100000 + Math.random() * 900000)}!`;
 
-  if (authErr || !newUser.user) {
-    const msg = authErr?.message ?? 'Error al crear usuario';
-    if (msg.includes('already been registered')) {
-      return NextResponse.json({ error: 'Ya existe una cuenta con ese email' }, { status: 409 });
+    const { data: newUser, error: authErr } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password: tempPassword,
+      email_confirm: true,
+      user_metadata: { display_name: brand_name, user_type: 'brand' },
+    });
+
+    if (authErr || !newUser.user) {
+      const msg = authErr?.message ?? 'Error al crear usuario';
+      if (msg.includes('already been registered')) {
+        return NextResponse.json({ error: 'Ya existe una cuenta con ese email' }, { status: 409 });
+      }
+      return NextResponse.json({ error: msg }, { status: 500 });
     }
-    return NextResponse.json({ error: msg }, { status: 500 });
+    brandUserId = newUser.user.id;
+  } else {
+    // Sin email: crear solo las filas de BD (marca gestionada por la agencia)
+    brandUserId = crypto.randomUUID();
   }
 
-  const brandUserId = newUser.user.id;
-
-  // Crear marketplace_users
+  // Crear marketplace_users (upsert por si el trigger ya lo creó)
   await supabaseAdmin.from('marketplace_users').upsert({
     id: brandUserId,
     user_type: 'brand',
@@ -131,7 +135,7 @@ export async function POST(req: NextRequest) {
     credits: 0,
   }, { onConflict: 'id' });
 
-  // Crear brand_profiles
+  // Crear brand_profiles (upsert por si el trigger ya lo creó)
   await supabaseAdmin.from('brand_profiles').upsert({
     user_id: brandUserId,
     brand_name,
@@ -150,7 +154,6 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     success: true,
     brand_user_id: brandUserId,
-    temp_password: tempPassword,
-    message: `Marca creada. Contraseña temporal: ${tempPassword}`,
+    ...(tempPassword ? { temp_password: tempPassword } : {}),
   });
 }
