@@ -7,6 +7,7 @@ import Button from './ui/Button';
 import { useAuth } from './AuthProvider';
 import { supabase, getUserCredits } from '@/lib/supabase';
 import { useUnreadCount } from '@/lib/hooks/useUnreadCount';
+import NotificationBell from './NotificationBell';
 
 export default function Navbar() {
   const router = useRouter();
@@ -83,6 +84,9 @@ export default function Navbar() {
                   </span>
                 )}
               </Link>
+
+              {/* Notificaciones */}
+              <NotificationBell userId={user.id} />
 
               {/* Avatar + dropdown */}
               <div className="relative">

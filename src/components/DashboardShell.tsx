@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { supabase, getMarketplaceUser } from '@/lib/supabase';
+import NotificationBell from '@/components/NotificationBell';
 
 type NavItem = { label: string; href: string; icon: React.ElementType; badge?: number };
 
@@ -133,15 +134,16 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       {/* User + Logout */}
       <div className="border-t border-gray-100 p-4 shrink-0">
         <div className="flex items-center gap-3 mb-3">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center text-white font-bold text-xs">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
             {(displayName || fallbackName).charAt(0).toUpperCase()}
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-gray-900 truncate">
               {displayName || fallbackName}
             </p>
             <p className="text-xs text-gray-400">{roleLabel}</p>
           </div>
+          {user && <NotificationBell userId={user.id} />}
         </div>
         <button
           onClick={handleLogout}
@@ -172,6 +174,9 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         <Link href="/">
           <img src="/logo-horizontal.svg" alt="Connectly" className="h-6 w-auto" />
         </Link>
+        <div className="ml-auto">
+          {user && <NotificationBell userId={user.id} />}
+        </div>
       </header>
 
       {/* Mobile drawer overlay */}

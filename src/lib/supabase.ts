@@ -729,6 +729,17 @@ export async function getApplicationById(appId: string): Promise<{
 
 // ─── Chat / Messages ──────────────────────────────────────────────────────────
 
+export interface Offer {
+  id: string;
+  sender_user_id: string;
+  receiver_user_id: string;
+  amount: number;
+  description: string | null;
+  status: 'pending' | 'accepted' | 'rejected';
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Message {
   id: string;
   conversation_id: string;
@@ -737,6 +748,9 @@ export interface Message {
   attachment_url: string | null;
   is_read: boolean;
   created_at: string;
+  message_type: 'text' | 'offer';
+  offer_id: string | null;
+  offer?: Offer | null;
 }
 
 /**
@@ -797,11 +811,11 @@ export async function getMessages(applicationId: string): Promise<Message[]> {
 
   const { data, error } = await supabase
     .from('messages')
-    .select('id, conversation_id, sender_user_id, content, attachment_url, is_read, created_at')
+    .select('id, conversation_id, sender_user_id, content, attachment_url, is_read, created_at, message_type, offer_id, offer:offers!offer_id(*)')
     .eq('conversation_id', convId)
     .order('created_at', { ascending: true });
   if (error) throw error;
-  return (data ?? []) as Message[];
+  return (data ?? []) as unknown as Message[];
 }
 
 /**
@@ -825,18 +839,153 @@ export async function sendMessage(
 
   const { data, error } = await supabase
     .from('messages')
-    .insert({ conversation_id: convId, sender_user_id: senderId, content })
-    .select('id, conversation_id, sender_user_id, content, attachment_url, is_read, created_at')
+    .insert({ conversation_id: convId, sender_user_id: senderId, content, message_type: 'text' })
+    .select('id, conversation_id, sender_user_id, content, attachment_url, is_read, created_at, message_type, offer_id')
     .single();
   if (error) throw error;
 
-  // Actualizar timestamp de última actividad de la conversación
   await supabase
     .from('conversations')
     .update({ last_message_at: new Date().toISOString() })
     .eq('id', convId);
 
-  return data as Message;
+  return { ...(data as Message), offer: null };
+}
+
+/** Envía una oferta de negociación en el chat de colaboración. */
+export async function sendOffer(params: {
+  applicationId: string;
+  senderUserId: string;
+  receiverUserId: string;
+  amount: number;
+  description?: string;
+}): Promise<void> {
+  const convId = await getOrCreateConversationForApplication(params.applicationId);
+  if (!convId) throw new Error('No se pudo obtener la conversación');
+
+  const { data: offer, error: offerErr } = await supabase
+    .from('offers')
+    .insert({
+      sender_user_id: params.senderUserId,
+      receiver_user_id: params.receiverUserId,
+      amount: params.amount,
+      description: params.description ?? null,
+    })
+    .select()
+    .single();
+  if (offerErr) throw offerErr;
+
+  const { error: msgErr } = await supabase
+    .from('messages')
+    .insert({
+      conversation_id: convId,
+      sender_user_id: params.senderUserId,
+      content: `Oferta: ${params.amount}€`,
+      message_type: 'offer',
+      offer_id: offer.id,
+    });
+  if (msgErr) throw msgErr;
+
+  await supabase
+    .from('conversations')
+    .update({ last_message_at: new Date().toISOString() })
+    .eq('id', convId);
+
+  // Notificar al receptor
+  await supabase.from('notifications').insert({
+    user_id: params.receiverUserId,
+    type: 'offer_received',
+    title: 'Nueva propuesta recibida',
+    body: `Has recibido una oferta de ${Number(params.amount).toLocaleString('es-ES')}€`,
+    data: { application_id: params.applicationId },
+  });
+}
+
+/** Acepta o rechaza una oferta del chat de colaboración. */
+export async function respondToOffer(params: {
+  offerId: string;
+  response: 'accepted' | 'rejected';
+  applicationId: string;
+  senderUserId: string;
+}): Promise<void> {
+  // Obtener sender original para notificarle
+  const { data: offer } = await supabase
+    .from('offers')
+    .select('sender_user_id')
+    .eq('id', params.offerId)
+    .maybeSingle();
+
+  const { error } = await supabase
+    .from('offers')
+    .update({ status: params.response })
+    .eq('id', params.offerId);
+  if (error) throw error;
+
+  const convId = await getOrCreateConversationForApplication(params.applicationId);
+  if (convId) {
+    const text = params.response === 'accepted' ? '✅ Oferta aceptada' : '❌ Oferta rechazada';
+    await supabase
+      .from('messages')
+      .insert({ conversation_id: convId, sender_user_id: params.senderUserId, content: text, message_type: 'text' });
+    await supabase
+      .from('conversations')
+      .update({ last_message_at: new Date().toISOString() })
+      .eq('id', convId);
+  }
+
+  // Notificar al remitente de la oferta
+  if (offer?.sender_user_id) {
+    await supabase.from('notifications').insert({
+      user_id: offer.sender_user_id,
+      type: 'offer_response',
+      title: params.response === 'accepted' ? '✅ Propuesta aceptada' : 'Propuesta rechazada',
+      body: params.response === 'accepted'
+        ? 'Tu propuesta ha sido aceptada. ¡Poneos en marcha!'
+        : 'Tu propuesta no ha sido aceptada. Puedes lanzar otra.',
+      data: { application_id: params.applicationId },
+    });
+  }
+}
+
+/** Acepta o rechaza una oferta en un chat directo. */
+export async function respondToDirectOffer(params: {
+  offerId: string;
+  response: 'accepted' | 'rejected';
+  conversationId: string;
+  senderUserId: string;
+}): Promise<void> {
+  const { data: offer } = await supabase
+    .from('offers')
+    .select('sender_user_id')
+    .eq('id', params.offerId)
+    .maybeSingle();
+
+  const { error } = await supabase
+    .from('offers')
+    .update({ status: params.response })
+    .eq('id', params.offerId);
+  if (error) throw error;
+
+  const text = params.response === 'accepted' ? '✅ Oferta aceptada' : '❌ Oferta rechazada';
+  await supabase
+    .from('direct_messages')
+    .insert({ direct_conversation_id: params.conversationId, sender_user_id: params.senderUserId, content: text, message_type: 'text' });
+  await supabase
+    .from('direct_conversations')
+    .update({ last_message_at: new Date().toISOString() })
+    .eq('id', params.conversationId);
+
+  if (offer?.sender_user_id) {
+    await supabase.from('notifications').insert({
+      user_id: offer.sender_user_id,
+      type: 'offer_response',
+      title: params.response === 'accepted' ? '✅ Propuesta aceptada' : 'Propuesta rechazada',
+      body: params.response === 'accepted'
+        ? 'Tu propuesta ha sido aceptada. ¡Poneos en marcha!'
+        : 'Tu propuesta no ha sido aceptada. Puedes lanzar otra.',
+      data: { conversation_id: params.conversationId },
+    });
+  }
 }
 
 // ─── Deliveries ───────────────────────────────────────────────────────────────
@@ -1504,6 +1653,9 @@ export interface DirectMessage {
   content: string;
   is_read: boolean;
   created_at: string;
+  message_type: 'text' | 'offer';
+  offer_id: string | null;
+  offer?: Offer | null;
 }
 
 export interface DirectConversationEnriched extends DirectConversation {
@@ -1583,10 +1735,10 @@ export async function getDirectConversationById(id: string): Promise<
 export async function getDirectMessages(conversationId: string): Promise<DirectMessage[]> {
   const { data } = await supabase
     .from('direct_messages')
-    .select('*')
+    .select('*, offer:offers!offer_id(*)')
     .eq('direct_conversation_id', conversationId)
     .order('created_at', { ascending: true });
-  return (data ?? []) as DirectMessage[];
+  return (data ?? []) as unknown as DirectMessage[];
 }
 
 /** Envía un mensaje directo y actualiza last_message_at. */
@@ -1597,7 +1749,7 @@ export async function sendDirectMessage(
 ): Promise<DirectMessage> {
   const { data, error } = await supabase
     .from('direct_messages')
-    .insert({ direct_conversation_id: conversationId, sender_user_id: senderUserId, content })
+    .insert({ direct_conversation_id: conversationId, sender_user_id: senderUserId, content, message_type: 'text' })
     .select()
     .single();
   if (error) throw error;
@@ -1608,7 +1760,53 @@ export async function sendDirectMessage(
     .update({ last_message_at: msg.created_at })
     .eq('id', conversationId);
 
-  return msg;
+  return { ...msg, offer: null };
+}
+
+/** Envía una oferta en un chat directo. */
+export async function sendDirectOffer(params: {
+  conversationId: string;
+  senderUserId: string;
+  receiverUserId: string;
+  amount: number;
+  description?: string;
+}): Promise<void> {
+  const { data: offer, error: offerErr } = await supabase
+    .from('offers')
+    .insert({
+      sender_user_id: params.senderUserId,
+      receiver_user_id: params.receiverUserId,
+      amount: params.amount,
+      description: params.description ?? null,
+    })
+    .select()
+    .single();
+  if (offerErr) throw offerErr;
+
+  const { error: msgErr } = await supabase
+    .from('direct_messages')
+    .insert({
+      direct_conversation_id: params.conversationId,
+      sender_user_id: params.senderUserId,
+      content: `Oferta: ${params.amount}€`,
+      message_type: 'offer',
+      offer_id: offer.id,
+    });
+  if (msgErr) throw msgErr;
+
+  await supabase
+    .from('direct_conversations')
+    .update({ last_message_at: new Date().toISOString() })
+    .eq('id', params.conversationId);
+
+  // Notificar al receptor
+  await supabase.from('notifications').insert({
+    user_id: params.receiverUserId,
+    type: 'offer_received',
+    title: 'Nueva propuesta recibida',
+    body: `Has recibido una oferta de ${Number(params.amount).toLocaleString('es-ES')}€`,
+    data: { conversation_id: params.conversationId },
+  });
 }
 
 /** Marca como leídos los mensajes recibidos en una conversación (los del otro). */
