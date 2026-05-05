@@ -10,8 +10,13 @@ import {
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import { useAuth } from '@/components/AuthProvider';
-import { getApplicationsByBrand, updateApplicationStatus, getDelivery } from '@/lib/supabase';
-import type { ApplicationWithCreator, CollabDelivery } from '@/lib/supabase';
+import {
+  getApplicationsByBrand, updateApplicationStatus, getDelivery,
+  getBrandProfileByUserId, getCollaborationsByBrand,
+} from '@/lib/supabase';
+import type { ApplicationWithCreator, CollabDelivery, BrandProfile } from '@/lib/supabase';
+import { OnboardingChecklist } from '@/components/OnboardingChecklist';
+import type { OnboardingStep } from '@/components/OnboardingChecklist';
 import BrandReviewModal from '@/components/BrandReviewModal';
 
 /* ─── MOCK DATA ─────────────────────────────────────────────────── */
@@ -86,6 +91,59 @@ export default function BrandDashboard() {
   const displayName = (user?.user_metadata?.display_name as string) ?? 'Mi Marca';
   const credits = 20; // mock — useCredits cuando haya plan Stripe
 
+  const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
+  const [hasCollabs, setHasCollabs] = useState(false);
+  const [onboardingSteps, setOnboardingSteps] = useState<OnboardingStep[]>([]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    Promise.all([getBrandProfileByUserId(user.id), getCollaborationsByBrand(user.id)])
+      .then(([profile, collabs]) => {
+        setBrandProfile(profile);
+        const hasAny = collabs.length > 0;
+        setHasCollabs(hasAny);
+        setOnboardingSteps([
+          {
+            id: 'account',
+            label: 'Cuenta creada',
+            hint: '',
+            href: '#',
+            done: true,
+          },
+          {
+            id: 'logo',
+            label: 'Añade tu logo',
+            hint: 'Las marcas con logo generan más confianza en los creadores.',
+            href: '/dashboard/brand/settings/profile',
+            done: !!profile?.logo_url,
+          },
+          {
+            id: 'description',
+            label: 'Escribe una descripción',
+            hint: 'Cuéntales a los creadores qué hace tu marca y qué tipo de colaboraciones buscas.',
+            href: '/dashboard/brand/settings/profile',
+            done: !!profile?.description && profile.description.length > 10,
+          },
+          {
+            id: 'collab',
+            label: 'Publica tu primera colaboración',
+            hint: 'Es la mejor forma de empezar a recibir solicitudes de creadores.',
+            href: '/dashboard/brand/collabs/new',
+            done: hasAny,
+            critical: true,
+          },
+          {
+            id: 'brief',
+            label: 'Define qué buscas en los creadores',
+            hint: 'El brief ayuda a que solo apliquen creadores que encajan contigo.',
+            href: '/dashboard/brand/settings/profile',
+            done: !!profile?.collab_brief && profile.collab_brief.length > 10,
+          },
+        ]);
+      })
+      .catch(console.error);
+  }, [user?.id]);
+
   // Cargar candidatos reales desde Supabase
   useEffect(() => {
     if (!user?.id) return;
@@ -156,6 +214,11 @@ export default function BrandDashboard() {
               <Plus size={15} /> Nueva colaboración
             </Button>
           </div>
+
+          {/* ── Onboarding ── */}
+          {onboardingSteps.length > 0 && (
+            <OnboardingChecklist role="brand" steps={onboardingSteps} />
+          )}
 
           {/* ── Banner reseñas pendientes ── */}
           {pendingReviews.length > 0 && (

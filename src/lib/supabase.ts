@@ -250,6 +250,8 @@ export interface InfluencerProfile {
   is_verified: boolean;
   is_claimed: boolean;
   creator_type: 'influencer' | 'ugc' | 'both';
+  portfolio_urls: string[];
+  engagement_rate_ig: number | null;
   bank_iban: string | null;
   bank_holder_name: string | null;
   bank_verified: boolean;

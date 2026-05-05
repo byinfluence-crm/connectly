@@ -9,8 +9,13 @@ import {
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import { useAuth } from '@/components/AuthProvider';
-import { getApplicationsByCreator, getPublicCollaborations, getContactRequestsForCreator } from '@/lib/supabase';
-import type { ApplicationWithCollab, PublicCollaboration } from '@/lib/supabase';
+import {
+  getApplicationsByCreator, getPublicCollaborations,
+  getContactRequestsForCreator, getInfluencerProfileByUserId,
+} from '@/lib/supabase';
+import type { ApplicationWithCollab, PublicCollaboration, InfluencerProfile } from '@/lib/supabase';
+import { OnboardingChecklist } from '@/components/OnboardingChecklist';
+import type { OnboardingStep } from '@/components/OnboardingChecklist';
 import DeliveryModal from '@/components/DeliveryModal';
 
 const COLLAB_TYPE_LABELS: Record<string, string> = {
@@ -46,8 +51,63 @@ export default function CreatorDashboard() {
   const [deliveryApp, setDeliveryApp] = useState<ApplicationWithCollab | null>(null);
   const [availableCollabs, setAvailableCollabs] = useState<PublicCollaboration[]>([]);
   const [pendingContacts, setPendingContacts] = useState(0);
+  const [creatorProfile, setCreatorProfile] = useState<InfluencerProfile | null>(null);
+  const [onboardingSteps, setOnboardingSteps] = useState<OnboardingStep[]>([]);
 
   const displayName = (user?.user_metadata?.display_name as string) ?? 'Creador';
+
+  // Cargar perfil + pasos onboarding
+  useEffect(() => {
+    if (!user?.id) return;
+    getInfluencerProfileByUserId(user.id).then(profile => {
+      setCreatorProfile(profile);
+      setOnboardingSteps([
+        {
+          id: 'account',
+          label: 'Cuenta creada',
+          hint: '',
+          href: '#',
+          done: true,
+        },
+        {
+          id: 'avatar',
+          label: 'Añade una foto de perfil',
+          hint: 'Los perfiles con foto reciben 3× más solicitudes de marcas.',
+          href: '/dashboard/creator/settings/profile',
+          done: !!profile?.avatar_url,
+        },
+        {
+          id: 'sync',
+          label: 'Sincroniza tus redes sociales',
+          hint: 'Imprescindible para aparecer en Discover. Las marcas necesitan ver tus estadísticas reales.',
+          href: '/dashboard/creator/settings/profile',
+          done: (profile?.followers_ig ?? 0) > 0,
+          critical: true,
+        },
+        {
+          id: 'bio',
+          label: 'Escribe tu bio',
+          hint: 'Cuéntale a las marcas quién eres, qué haces y qué tipo de colaboraciones te interesan.',
+          href: '/dashboard/creator/settings/profile',
+          done: !!profile?.bio && profile.bio.length > 10,
+        },
+        {
+          id: 'portfolio',
+          label: 'Sube tu portfolio',
+          hint: 'Muestra ejemplos de tu trabajo para que las marcas puedan evaluar tu estilo.',
+          href: '/dashboard/creator/settings/profile',
+          done: (profile?.portfolio_urls?.length ?? 0) >= 1,
+        },
+        {
+          id: 'prices',
+          label: 'Define tus tarifas',
+          hint: 'Las marcas filtran por precio. Sin tarifas, puede que no te encuentren.',
+          href: '/dashboard/creator/settings/profile',
+          done: profile?.price_min != null || profile?.price_max != null,
+        },
+      ]);
+    }).catch(console.error);
+  }, [user?.id]);
 
   // Cargar aplicaciones reales desde Supabase
   useEffect(() => {
@@ -112,6 +172,11 @@ export default function CreatorDashboard() {
               </Button>
             </Link>
           </div>
+
+          {/* ── Onboarding ── */}
+          {onboardingSteps.length > 0 && (
+            <OnboardingChecklist role="creator" steps={onboardingSteps} />
+          )}
 
           {/* ── Stats ── */}
           <div className="grid grid-cols-3 gap-3">
