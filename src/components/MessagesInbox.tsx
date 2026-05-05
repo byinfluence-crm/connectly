@@ -119,15 +119,22 @@ export default function MessagesInbox() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline justify-between gap-2 mb-0.5">
-                        <p className="font-semibold text-gray-900 truncate text-sm">{conv.other_name}</p>
-                        {conv.last_message_at && (
-                          <span className="text-xs text-gray-400 shrink-0">{timeAgo(conv.last_message_at)}</span>
-                        )}
+                        <p className={`truncate text-sm ${conv.unread_count > 0 ? 'font-bold text-gray-900' : 'font-semibold text-gray-900'}`}>{conv.other_name}</p>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {conv.last_message_at && (
+                            <span className={`text-xs ${conv.unread_count > 0 ? 'text-violet-600 font-semibold' : 'text-gray-400'}`}>{timeAgo(conv.last_message_at)}</span>
+                          )}
+                          {conv.unread_count > 0 && (
+                            <span className="bg-violet-600 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                              {conv.unread_count > 9 ? '9+' : conv.unread_count}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <p className="text-[10px] text-violet-500 font-medium mb-0.5">Chat directo</p>
                       {conv.last_message_content ? (
-                        <p className="text-sm text-gray-500 truncate">
-                          {conv.last_message_mine && <span className="text-gray-400">Tú: </span>}
+                        <p className={`text-sm truncate ${conv.unread_count > 0 ? 'text-gray-800 font-medium' : 'text-gray-500'}`}>
+                          {conv.last_message_mine && <span className="text-gray-400 font-normal">Tú: </span>}
                           {conv.last_message_content}
                         </p>
                       ) : (

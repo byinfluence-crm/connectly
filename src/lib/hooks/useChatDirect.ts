@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase, getDirectMessages, sendDirectMessage } from '@/lib/supabase';
+import { supabase, getDirectMessages, sendDirectMessage, markDirectMessagesRead } from '@/lib/supabase';
 import type { DirectMessage } from '@/lib/supabase';
 import { containsBlockedContent } from './useChat';
 
@@ -17,7 +17,10 @@ export function useChatDirect(conversationId: string, userId: string) {
     setLoading(true);
 
     getDirectMessages(conversationId)
-      .then(msgs => { if (!cancelled) setMessages(msgs); })
+      .then(msgs => {
+        if (!cancelled) setMessages(msgs);
+        if (!cancelled && userId) markDirectMessagesRead(conversationId, userId).catch(() => {});
+      })
       .catch(console.error)
       .finally(() => { if (!cancelled) setLoading(false); });
 
@@ -43,6 +46,10 @@ export function useChatDirect(conversationId: string, userId: string) {
           setMessages(prev =>
             prev.some(m => m.id === msg.id) ? prev : [...prev, msg],
           );
+          // Si el mensaje es del otro, marcarlo como leído inmediatamente
+          if (msg.sender_user_id !== userId) {
+            markDirectMessagesRead(conversationId, userId).catch(() => {});
+          }
         },
       )
       .subscribe();

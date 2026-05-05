@@ -1461,6 +1461,7 @@ export interface DirectConversationEnriched extends DirectConversation {
   other_avatar: string | null;
   last_message_content: string | null;
   last_message_mine: boolean | null;
+  unread_count: number;
 }
 
 /** Crea o devuelve la conversación directa entre una marca y un creador. */
@@ -1559,6 +1560,19 @@ export async function sendDirectMessage(
   return msg;
 }
 
+/** Marca como leídos los mensajes recibidos en una conversación (los del otro). */
+export async function markDirectMessagesRead(
+  conversationId: string,
+  userId: string,
+): Promise<void> {
+  await supabase
+    .from('direct_messages')
+    .update({ is_read: true })
+    .eq('direct_conversation_id', conversationId)
+    .eq('is_read', false)
+    .neq('sender_user_id', userId);
+}
+
 /** Lista todas las conversaciones directas de un usuario, enriquecidas con el nombre del otro. */
 export async function getDirectConversationsForUser(
   userId: string,
@@ -1580,7 +1594,8 @@ export async function getDirectConversationsForUser(
     .select('id, display_name')
     .in('id', allOtherIds);
 
-  const [{ data: brandAvatars }, { data: creatorAvatars }, { data: lastMsgs }] = await Promise.all([
+  const convIds = convs.map(c => c.id);
+  const [{ data: brandAvatars }, { data: creatorAvatars }, { data: allMsgs }] = await Promise.all([
     brandOtherIds.length
       ? supabase.from('brand_profiles').select('user_id, logo_url').in('user_id', brandOtherIds)
       : Promise.resolve({ data: [] }),
@@ -1589,15 +1604,19 @@ export async function getDirectConversationsForUser(
       : Promise.resolve({ data: [] }),
     supabase
       .from('direct_messages')
-      .select('direct_conversation_id, content, sender_user_id, created_at')
-      .in('direct_conversation_id', convs.map(c => c.id))
+      .select('direct_conversation_id, content, sender_user_id, created_at, is_read')
+      .in('direct_conversation_id', convIds)
       .order('created_at', { ascending: false }),
   ]);
 
   const lastMsgMap = new Map<string, { content: string; sender_user_id: string }>();
-  for (const m of lastMsgs ?? []) {
+  const unreadMap = new Map<string, number>();
+  for (const m of allMsgs ?? []) {
     if (!lastMsgMap.has(m.direct_conversation_id)) {
       lastMsgMap.set(m.direct_conversation_id, m);
+    }
+    if (!m.is_read && m.sender_user_id !== userId) {
+      unreadMap.set(m.direct_conversation_id, (unreadMap.get(m.direct_conversation_id) ?? 0) + 1);
     }
   }
 
@@ -1620,6 +1639,7 @@ export async function getDirectConversationsForUser(
       other_avatar: otherAvatar,
       last_message_content: lastMsg?.content ?? null,
       last_message_mine: lastMsg ? lastMsg.sender_user_id === userId : null,
+      unread_count: unreadMap.get(c.id) ?? 0,
     };
   });
 }
