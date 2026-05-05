@@ -480,19 +480,27 @@ function InfluencerCard({
 
 /* ─── UGC CREATOR CARD ─────────────────────────────────────────────────────── */
 function UgcCreatorCard({
-  creator, featured, userType, userId,
+  creator, featured, userType, userId, onPreview,
 }: {
   creator: PublicInfluencerProfile;
   featured?: boolean;
   userType: string | null;
   userId: string | null;
+  onPreview?: (creator: PublicInfluencerProfile) => void;
 }) {
   const router = useRouter();
   const [showModal, setShowModal] = useState(false);
 
-  const handleContact = () => {
+  const handleContact = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (!userId) { router.push('/login'); return; }
     setShowModal(true);
+  };
+
+  const handleCardClick = () => {
+    if (onPreview) { onPreview(creator); return; }
+    if (userId) setShowModal(true);
+    else router.push('/login');
   };
 
   const name = creator.display_name;
@@ -506,7 +514,7 @@ function UgcCreatorCard({
   const available = true;
 
   return (
-    <div className={`group bg-white rounded-2xl overflow-hidden border transition-all duration-200 hover:shadow-xl hover:-translate-y-0.5 ${featured ? 'border-violet-300 ring-2 ring-violet-100 shadow-md' : 'border-gray-100 shadow-sm'}`}>
+    <div onClick={handleCardClick} className={`group bg-white rounded-2xl overflow-hidden border transition-all duration-200 hover:shadow-xl hover:-translate-y-0.5 cursor-pointer ${featured ? 'border-violet-300 ring-2 ring-violet-100 shadow-md' : 'border-gray-100 shadow-sm'}`}>
       {/* Portfolio grid */}
       <div className="relative h-40 grid grid-cols-3 gap-0.5 overflow-hidden bg-gray-100">
         {portfolio.map((src, i) => (
@@ -781,6 +789,7 @@ export default function DiscoverPage() {
 
   const [drawerCreator, setDrawerCreator] = useState<PublicInfluencerProfile | null>(null);
   const [drawerChatLoading, setDrawerChatLoading] = useState(false);
+  const [contactCreator, setContactCreator] = useState<PublicInfluencerProfile | null>(null);
 
   const isUnlocked = (infId: string) => persistedUnlocked.has(infId);
 
@@ -846,8 +855,12 @@ export default function DiscoverPage() {
           onUnlock={handleUnlock}
           onClose={() => setDrawerCreator(null)}
           onOpenChat={handleDrawerOpenChat}
+          onContact={c => { setDrawerCreator(null); setContactCreator(c); }}
           chatLoading={drawerChatLoading}
         />
+      )}
+      {contactCreator && (
+        <ContactModal creator={contactCreator} onClose={() => setContactCreator(null)} />
       )}
 
       <div className="pt-16">
@@ -978,7 +991,7 @@ export default function DiscoverPage() {
                         <InfluencerCard key={inf.id} inf={inf} featured credits={credits} unlocking={unlocking} onUnlock={handleUnlock} isUnlocked={isUnlocked(inf.id)} userId={user?.id ?? null} userType={userType} onPreview={setDrawerCreator} />
                       ))}
                       {featuredUgc.map(c => (
-                        <UgcCreatorCard key={c.id} creator={c} featured userType={userType} userId={user?.id ?? null} />
+                        <UgcCreatorCard key={c.id} creator={c} featured userType={userType} userId={user?.id ?? null} onPreview={setDrawerCreator} />
                       ))}
                     </div>
                   </section>
@@ -1008,7 +1021,7 @@ export default function DiscoverPage() {
                       <InfluencerCard key={inf.id} inf={inf} credits={credits} unlocking={unlocking} onUnlock={handleUnlock} isUnlocked={isUnlocked(inf.id)} userId={user?.id ?? null} userType={userType} onPreview={setDrawerCreator} />
                     ))}
                     {restUgc.map(c => (
-                      <UgcCreatorCard key={c.id} creator={c} userType={userType} userId={user?.id ?? null} />
+                      <UgcCreatorCard key={c.id} creator={c} userType={userType} userId={user?.id ?? null} onPreview={setDrawerCreator} />
                     ))}
                   </div>
 
