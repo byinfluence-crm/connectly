@@ -2,10 +2,11 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Menu, X, Zap, LogOut, ChevronDown } from 'lucide-react';
+import { Menu, X, Zap, LogOut, ChevronDown, MessageCircle } from 'lucide-react';
 import Button from './ui/Button';
 import { useAuth } from './AuthProvider';
 import { supabase, getUserCredits } from '@/lib/supabase';
+import { useUnreadCount } from '@/lib/hooks/useUnreadCount';
 
 export default function Navbar() {
   const router = useRouter();
@@ -13,12 +14,15 @@ export default function Navbar() {
   const [open, setOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [credits, setCredits] = useState<number | null>(null);
+  const unreadCount = useUnreadCount(user?.id);
 
-  // Cargar créditos cuando hay sesión
   useEffect(() => {
     if (!user) { setCredits(null); return; }
     getUserCredits(user.id).then(setCredits).catch(() => setCredits(null));
   }, [user]);
+
+  const userType = user?.user_metadata?.user_type as string | undefined;
+  const messagesHref = userType === 'brand' ? '/dashboard/brand/messages' : '/dashboard/creator/messages';
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -69,6 +73,16 @@ export default function Navbar() {
                   {credits} créditos
                 </div>
               )}
+
+              {/* Mensajes con badge no leídos */}
+              <Link href={messagesHref} className="relative p-2 rounded-xl hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-800">
+                <MessageCircle size={20} />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 bg-violet-600 text-white text-[10px] font-bold rounded-full min-w-[17px] h-[17px] flex items-center justify-center px-0.5 leading-none">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </Link>
 
               {/* Avatar + dropdown */}
               <div className="relative">
@@ -155,6 +169,18 @@ export default function Navbar() {
                   <Zap size={12} className="fill-violet-600" /> {credits} créditos
                 </div>
               )}
+              <Link
+                href={messagesHref}
+                onClick={() => setOpen(false)}
+                className="flex items-center justify-between text-sm text-gray-700 px-1 py-1"
+              >
+                <span className="flex items-center gap-2"><MessageCircle size={14} /> Mensajes</span>
+                {unreadCount > 0 && (
+                  <span className="bg-violet-600 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </Link>
               <div className="text-sm font-semibold text-gray-900 px-1">{displayName ?? user.email}</div>
               <button
                 onClick={handleLogout}
