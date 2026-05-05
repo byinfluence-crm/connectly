@@ -1433,6 +1433,7 @@ export async function getBrandAnalytics(brandId: string) {
     .select(`
       id, influencer_profile_id, collab_status, created_at,
       creator:marketplace_users!influencer_profile_id ( display_name, niche ),
+      inf:influencer_profiles!influencer_profile_id ( rating_avg, user_id ),
       delivery:collaboration_deliveries!application_id (
         reach, impressions, interactions, video_views,
         submitted_at
@@ -1446,6 +1447,7 @@ export async function getBrandAnalytics(brandId: string) {
     collab_status: string | null;
     created_at: string;
     creator: { display_name: string; niche: string | null } | null;
+    inf: { rating_avg: number; user_id: string | null } | null;
     delivery: {
       reach: number | null; impressions: number | null;
       interactions: number | null; video_views: number | null;

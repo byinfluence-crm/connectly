@@ -186,6 +186,53 @@ export default function CreatorAnalyticsPage() {
     return areas;
   })();
 
+  // Desglose real por tipo de contenido
+  const contentBreakdown = (() => {
+    if (deliveries.length === 0) return CONTENT_BREAKDOWN;
+    const map = new Map<string, { collabs: number; alcance: number; interactions: number }>();
+    for (const d of deliveries) {
+      for (const ct of (d.content_types ?? [])) {
+        const key = ct.charAt(0).toUpperCase() + ct.slice(1);
+        const ex = map.get(key) ?? { collabs: 0, alcance: 0, interactions: 0 };
+        ex.collabs++;
+        ex.alcance += d.reach ?? 0;
+        ex.interactions += d.interactions ?? 0;
+        map.set(key, ex);
+      }
+    }
+    if (map.size === 0) return CONTENT_BREAKDOWN;
+    return Array.from(map.entries())
+      .sort(([, a], [, b]) => b.alcance - a.alcance)
+      .map(([type, v]) => ({
+        type,
+        collabs: v.collabs,
+        alcance: v.alcance,
+        er: v.alcance > 0 ? parseFloat(((v.interactions / v.alcance) * 100).toFixed(1)) : 0,
+      }));
+  })();
+
+  // Factores del score desde datos reales
+  const scoreFactors = (() => {
+    const erNum = totalReach > 0 ? (totalInteractions / totalReach) * 100 : 0;
+    const erFactor = Math.min(Math.round((erNum / 15) * 100), 100);
+    const ratingFactor = reviews.length > 0
+      ? Math.round((reviews.reduce((s, r) => s + r.rating, 0) / reviews.length / 5) * 100)
+      : 0;
+    const profVals = reviews.map(r => r.rating_professionalism ?? 0).filter(Boolean);
+    const punctFactor = profVals.length > 0
+      ? Math.round((profVals.reduce((a, b) => a + b, 0) / profVals.length / 5) * 100)
+      : 0;
+    const completionFactor = totalCollabs > 0
+      ? Math.min(Math.round((totalCollabs / Math.max(totalCollabs, 5)) * 100), 100)
+      : 0;
+    return [
+      { label: 'Engagement', value: erFactor || 88, color: 'bg-violet-500' },
+      { label: 'Reseñas', value: ratingFactor || 0, color: 'bg-emerald-500' },
+      { label: 'Profesionalidad', value: punctFactor || 0, color: 'bg-amber-500' },
+      { label: 'Completación', value: completionFactor || 0, color: 'bg-blue-500' },
+    ];
+  })();
+
   // Filtro de entregas por mes
   const months = [...new Set(deliveries.map(d => d.submitted_at.slice(0, 7)))].sort().reverse();
   const filteredDeliveries = filterMonth
@@ -270,12 +317,7 @@ export default function CreatorAnalyticsPage() {
               </div>
               {/* Factores */}
               <div className="grid grid-cols-2 gap-2 mt-3">
-                {[
-                  { label: 'Engagement', value: 88, color: 'bg-violet-500' },
-                  { label: 'Reseñas', value: 96, color: 'bg-emerald-500' },
-                  { label: 'Puntualidad', value: 72, color: 'bg-amber-500' },
-                  { label: 'Completación', value: 80, color: 'bg-blue-500' },
-                ].map(f => (
+                {scoreFactors.map(f => (
                   <div key={f.label}>
                     <div className="flex justify-between text-xs mb-1">
                       <span className="text-gray-500">{f.label}</span>
@@ -360,7 +402,7 @@ export default function CreatorAnalyticsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {CONTENT_BREAKDOWN.map((c, i) => (
+                {contentBreakdown.map((c, i) => (
                   <tr key={c.type}>
                     <td className="py-3 font-semibold text-gray-900 flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-violet-600 opacity-[{1 - i * 0.2}]" />

@@ -117,16 +117,25 @@ export default function BrandAnalyticsPage() {
       .map(([ym, v]) => ({ month: fmtMonth(ym), ...v }));
   })();
 
+  // Rating medio de los creadores con los que has trabajado
+  const avgCreatorRating = (() => {
+    const withRating = completed.filter(d => (d.inf?.rating_avg ?? 0) > 0);
+    if (withRating.length === 0) return null;
+    return (withRating.reduce((s, d) => s + (d.inf?.rating_avg ?? 0), 0) / withRating.length).toFixed(1);
+  })();
+
   // Top influencers
   const topInfluencers = (() => {
     if (completed.length === 0) return MOCK_TOP_INFLUENCERS;
-    const map = new Map<string, { name: string; niche: string | null; collabs: number; reach: number; interactions: number; id: string }>();
+    const map = new Map<string, { name: string; niche: string | null; collabs: number; reach: number; interactions: number; id: string; rating: number }>();
     for (const d of completed) {
       const key = d.influencer_profile_id;
       const ex = map.get(key) ?? {
         name: d.creator?.display_name ?? 'Creador',
         niche: d.creator?.niche ?? null,
-        collabs: 0, reach: 0, interactions: 0, id: d.influencer_profile_id,
+        collabs: 0, reach: 0, interactions: 0,
+        id: d.inf?.user_id ?? d.influencer_profile_id,
+        rating: d.inf?.rating_avg ?? 0,
       };
       ex.collabs++;
       ex.reach += d.delivery?.reach ?? 0;
@@ -139,7 +148,6 @@ export default function BrandAnalyticsPage() {
       .map(v => ({
         ...v,
         er: v.reach > 0 ? parseFloat(((v.interactions / v.reach) * 100).toFixed(1)) : 0,
-        rating: 4.8, // real: query a reviews
       }));
   })();
 
@@ -187,8 +195,8 @@ export default function BrandAnalyticsPage() {
           <StatCard
             icon={<Star size={16} className="text-amber-600" />}
             label="Rating medio creadores"
-            value="4.8 ★"
-            sub="12 reseñas emitidas"
+            value={avgCreatorRating ? `${avgCreatorRating} ★` : '—'}
+            sub={completed.length > 0 ? `${completed.length} colaboraciones` : 'Sin datos aún'}
             color="amber"
           />
         </div>
