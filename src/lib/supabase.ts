@@ -379,6 +379,29 @@ export async function deleteCollaboration(collabId: string): Promise<void> {
   if (error) throw error;
 }
 
+/** Actualiza los campos editables de una colaboración. */
+export async function updateCollaboration(
+  collabId: string,
+  input: Partial<CollaborationInput>,
+): Promise<void> {
+  const patch: Record<string, unknown> = {};
+  if (input.title !== undefined) patch.title = input.title;
+  if (input.description !== undefined) patch.description = input.description ?? null;
+  if (input.collab_type !== undefined) patch.collab_type = input.collab_type;
+  if (input.budget_min !== undefined) patch.budget_min = input.budget_min ?? null;
+  if (input.budget_max !== undefined) patch.budget_max = input.budget_max ?? null;
+  if (input.niches_required !== undefined) patch.niches_required = input.niches_required;
+  if (input.city !== undefined) patch.city = input.city ?? null;
+  if (input.deadline !== undefined) patch.deadline = input.deadline ?? null;
+  if (input.requirements !== undefined) patch.requirements = input.requirements ?? null;
+  if (input.min_followers !== undefined) patch.min_followers = input.min_followers ?? 0;
+  const { error } = await supabase
+    .from('collaborations')
+    .update(patch)
+    .eq('id', collabId);
+  if (error) throw error;
+}
+
 // ─── Discover — Influencer Profiles ────────────────────────────────────────
 
 /** Perfil público de influencer/UGC para /discover */

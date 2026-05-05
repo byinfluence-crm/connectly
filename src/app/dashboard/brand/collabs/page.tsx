@@ -1,8 +1,8 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, MoreHorizontal, Clock, FileText } from 'lucide-react';
+import { Plus, MoreHorizontal, Clock, FileText, Pencil, X, RotateCcw, Trash2 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import {
   getCollaborationsByBrand,
@@ -38,6 +38,89 @@ function budgetLabel(c: Collaboration): string | null {
   return `${c.budget_min ?? c.budget_max}€`;
 }
 
+function CollabMenu({
+  collab,
+  onStatus,
+  onDelete,
+}: {
+  collab: Collaboration;
+  onStatus: (id: string, s: CollabStatus) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const status = collab.status as CollabStatus;
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+        title="Más opciones"
+      >
+        <MoreHorizontal size={16} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-8 z-20 w-44 bg-white rounded-xl shadow-lg border border-gray-100 py-1 text-sm">
+          <button
+            onClick={() => { setOpen(false); router.push(`/dashboard/brand/collabs/${collab.id}/edit`); }}
+            className="w-full flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <Pencil size={13} /> Editar
+          </button>
+
+          {status === 'draft' && (
+            <button
+              onClick={() => { setOpen(false); onStatus(collab.id, 'active'); }}
+              className="w-full flex items-center gap-2 px-4 py-2 text-emerald-700 hover:bg-emerald-50 transition-colors"
+            >
+              <RotateCcw size={13} /> Publicar
+            </button>
+          )}
+
+          {status === 'active' && (
+            <button
+              onClick={() => { setOpen(false); onStatus(collab.id, 'closed'); }}
+              className="w-full flex items-center gap-2 px-4 py-2 text-orange-600 hover:bg-orange-50 transition-colors"
+            >
+              <X size={13} /> Cerrar campaña
+            </button>
+          )}
+
+          {status === 'closed' && (
+            <button
+              onClick={() => { setOpen(false); onStatus(collab.id, 'active'); }}
+              className="w-full flex items-center gap-2 px-4 py-2 text-emerald-700 hover:bg-emerald-50 transition-colors"
+            >
+              <RotateCcw size={13} /> Reabrir
+            </button>
+          )}
+
+          <div className="border-t border-gray-100 my-1" />
+          <button
+            onClick={() => { setOpen(false); onDelete(collab.id); }}
+            className="w-full flex items-center gap-2 px-4 py-2 text-red-500 hover:bg-red-50 transition-colors"
+          >
+            <Trash2 size={13} /> Eliminar
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function CollabsPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -67,7 +150,7 @@ export default function CollabsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('¿Eliminar esta colaboración?')) return;
+    if (!confirm('¿Eliminar esta colaboración? Esta acción no se puede deshacer.')) return;
     try {
       await deleteCollaboration(id);
       setCollabs(cs => cs.filter(c => c.id !== id));
@@ -100,108 +183,88 @@ export default function CollabsPage() {
         </Link>
       </div>
 
-        {/* Filtros */}
-        <div className="flex gap-2">
-          {(['all', 'active', 'draft', 'closed'] as const).map(s => (
-            <button
-              key={s}
-              onClick={() => setFilter(s)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
-                filter === s ? 'bg-violet-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-violet-300'
-              }`}
-            >
-              {s === 'all' ? 'Todas' : STATUS_CONFIG[s].label}
+      {/* Filtros */}
+      <div className="flex gap-2">
+        {(['all', 'active', 'draft', 'closed'] as const).map(s => (
+          <button
+            key={s}
+            onClick={() => setFilter(s)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+              filter === s ? 'bg-violet-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-violet-300'
+            }`}
+          >
+            {s === 'all' ? 'Todas' : STATUS_CONFIG[s].label}
+          </button>
+        ))}
+      </div>
+
+      {/* Lista */}
+      {filtered.length === 0 ? (
+        <div className="bg-white rounded-2xl p-12 text-center border border-gray-100 shadow-sm">
+          <FileText size={32} className="text-gray-300 mx-auto mb-3" />
+          <p className="text-sm text-gray-500 mb-4">
+            {filter === 'all' ? 'Aún no tienes colaboraciones' : `No hay colaboraciones en estado "${STATUS_CONFIG[filter as CollabStatus]?.label}"`}
+          </p>
+          <Link href="/dashboard/brand/collabs/new">
+            <button className="px-5 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 transition-colors">
+              Crear primera campaña
             </button>
-          ))}
+          </Link>
         </div>
-
-        {/* Lista */}
-        {filtered.length === 0 ? (
-          <div className="bg-white rounded-2xl p-12 text-center border border-gray-100 shadow-sm">
-            <FileText size={32} className="text-gray-300 mx-auto mb-3" />
-            <p className="text-sm text-gray-500 mb-4">
-              {filter === 'all' ? 'Aún no tienes colaboraciones' : `No hay colaboraciones en estado "${STATUS_CONFIG[filter as CollabStatus]?.label}"`}
-            </p>
-            <Link href="/dashboard/brand/collabs/new">
-              <button className="px-5 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 transition-colors">
-                Crear primera campaña
-              </button>
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {filtered.map(c => {
-              const status = c.status as CollabStatus;
-              const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.draft;
-              const budget = budgetLabel(c);
-              const niche = c.niches_required?.[0] ?? '—';
-              return (
-                <div key={c.id} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-start gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <span className="text-sm font-bold text-gray-900 truncate">{c.title}</span>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${cfg.color}`}>{cfg.label}</span>
-                        {budget && (
-                          <span className="text-xs text-violet-700 font-semibold bg-violet-50 px-2 py-0.5 rounded-full">
-                            {budget}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 text-xs text-gray-400 flex-wrap">
-                        <span>{niche}</span>
-                        <span>·</span>
-                        <span>{c.city ?? '—'}</span>
-                        <span>·</span>
-                        <span>{TYPE_LABELS[c.collab_type] ?? c.collab_type}</span>
-                        <span>·</span>
-                        <span className="flex items-center gap-1"><Clock size={11} /> Hasta {fmt(c.deadline)}</span>
-                      </div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map(c => {
+            const status = c.status as CollabStatus;
+            const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.draft;
+            const budget = budgetLabel(c);
+            const niche = c.niches_required?.[0] ?? '—';
+            return (
+              <div key={c.id} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <span className="text-sm font-bold text-gray-900 truncate">{c.title}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${cfg.color}`}>{cfg.label}</span>
+                      {budget && (
+                        <span className="text-xs text-violet-700 font-semibold bg-violet-50 px-2 py-0.5 rounded-full">
+                          {budget}
+                        </span>
+                      )}
                     </div>
-
-                    {/* Acciones */}
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {status === 'draft' && (
-                        <button
-                          onClick={() => handleStatusChange(c.id, 'active')}
-                          className="text-xs px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 font-semibold hover:bg-emerald-100 transition-colors"
-                        >
-                          Publicar
-                        </button>
-                      )}
-                      {status === 'active' && (
-                        <button
-                          onClick={() => handleStatusChange(c.id, 'closed')}
-                          className="text-xs px-3 py-1.5 rounded-xl bg-gray-50 text-gray-600 font-semibold hover:bg-gray-100 transition-colors"
-                        >
-                          Cerrar
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleDelete(c.id)}
-                        className="p-1.5 rounded-lg text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors"
-                        title="Eliminar"
-                      >
-                        <MoreHorizontal size={16} />
-                      </button>
+                    <div className="flex items-center gap-3 text-xs text-gray-400 flex-wrap">
+                      <span>{niche}</span>
+                      <span>·</span>
+                      <span>{c.city ?? '—'}</span>
+                      <span>·</span>
+                      <span>{TYPE_LABELS[c.collab_type] ?? c.collab_type}</span>
+                      <span>·</span>
+                      <span className="flex items-center gap-1"><Clock size={11} /> Hasta {fmt(c.deadline)}</span>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
 
-        {/* CTA si hay collabs */}
-        {filtered.length > 0 && (
-          <Link href="/dashboard/brand/collabs/new">
-            <div className="border-2 border-dashed border-violet-200 rounded-2xl p-4 text-center hover:border-violet-400 hover:bg-violet-50/30 transition-colors cursor-pointer">
-              <span className="text-sm text-violet-600 font-semibold flex items-center justify-center gap-2">
-                <Plus size={16} /> Nueva colaboración
-              </span>
-            </div>
-          </Link>
-        )}
+                  {/* Acciones */}
+                  <CollabMenu
+                    collab={c}
+                    onStatus={handleStatusChange}
+                    onDelete={handleDelete}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* CTA si hay collabs */}
+      {filtered.length > 0 && (
+        <Link href="/dashboard/brand/collabs/new">
+          <div className="border-2 border-dashed border-violet-200 rounded-2xl p-4 text-center hover:border-violet-400 hover:bg-violet-50/30 transition-colors cursor-pointer">
+            <span className="text-sm text-violet-600 font-semibold flex items-center justify-center gap-2">
+              <Plus size={16} /> Nueva colaboración
+            </span>
+          </div>
+        </Link>
+      )}
     </div>
   );
 }
