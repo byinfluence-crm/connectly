@@ -36,11 +36,8 @@ export default function Navbar() {
     <header className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center shadow-sm">
-            <span className="text-white font-bold text-sm">C</span>
-          </div>
-          <span className="font-bold text-gray-900 text-lg tracking-tight">Connectly</span>
+        <Link href="/" className="flex items-center">
+          <img src="/logo-horizontal.svg" alt="Connectly" className="h-8 w-auto" />
         </Link>
 
         {/* Desktop nav */}

@@ -4,41 +4,18 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import {
   ArrowLeft, MapPin, BadgeCheck, Flame, Star,
-  TrendingUp, Users, BarChart3, ExternalLink,
+  TrendingUp, Users, BarChart3, ExternalLink, Send, CheckCircle, MessageCircle,
 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import { useAuth } from '@/components/AuthProvider';
-import { getPublicProfile, getReviewsForCreator } from '@/lib/supabase';
+import { authFetch } from '@/lib/auth-fetch';
+import { getPublicProfile, getReviewsForCreator, getOrCreateDirectConversation } from '@/lib/supabase';
 import type { PublicProfile, Review } from '@/lib/supabase';
 
-// ─── Mock data supplementing real profile ────────────────────────────────────
-
-const NICHE_STATS: Record<string, { followers: string; er: string; avgReach: string }> = {
-  Moda:        { followers: '48,2K', er: '4,2%', avgReach: '12,4K' },
-  Fitness:     { followers: '91,0K', er: '3,8%', avgReach: '24,1K' },
-  Gastronomía: { followers: '32,5K', er: '5,1%', avgReach: '9,8K' },
-  Bienestar:   { followers: '18,3K', er: '7,4%', avgReach: '6,2K' },
-  Belleza:     { followers: '29,8K', er: '5,8%', avgReach: '8,7K' },
-  Tecnología:  { followers: '55,1K', er: '2,9%', avgReach: '16,0K' },
-  Viajes:      { followers: '72,4K', er: '4,6%', avgReach: '21,3K' },
-  default:     { followers: '25,0K', er: '4,5%', avgReach: '7,5K' },
-};
-
-const MOCK_REVIEWS = [
-  {
-    id: 1, brand: 'Casa Nova', rating: 5, text: 'Increíble trabajo, muy profesional y el contenido superó nuestras expectativas.',
-    date: 'marzo 2026', logo: 'https://picsum.photos/seed/casanova-r/40/40',
-  },
-  {
-    id: 2, brand: 'SkinGlow', rating: 5, text: 'Muy buena comunicación y entrega puntual. Repetiremos sin duda.',
-    date: 'febrero 2026', logo: 'https://picsum.photos/seed/skinglow-r/40/40',
-  },
-  {
-    id: 3, brand: 'ActiveWear', rating: 4, text: 'Buen contenido, creativo y con buen engagement. Lo recomendamos.',
-    date: 'enero 2026', logo: 'https://picsum.photos/seed/active-r/40/40',
-  },
-];
+function formatK(n: number) {
+  return n >= 1_000_000 ? (n / 1_000_000).toFixed(1) + 'M' : n >= 1000 ? (n / 1000).toFixed(1) + 'K' : String(n);
+}
 
 function getPortfolioPics(seed: string) {
   return Array.from({ length: 9 }, (_, i) => `https://picsum.photos/seed/${seed}-p${i}/300/300`);
@@ -58,6 +35,101 @@ function Stars({ rating }: { rating: number }) {
   );
 }
 
+// ─── ContactModal ─────────────────────────────────────────────────────────────
+
+function ContactModal({
+  profile, onClose,
+}: {
+  profile: PublicProfile;
+  onClose: () => void;
+}) {
+  const [message, setMessage] = useState('');
+  const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  const handleSubmit = async () => {
+    setSending(true);
+    try {
+      const res = await authFetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ creator_user_id: profile.id, message: message.trim() || null }),
+      });
+      if (res.ok) setSent(true);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const coverSeed = `cover-${profile.id.slice(0, 6)}`;
+  const avatarSrc = profile.avatar_url ?? `https://picsum.photos/seed/avatar-${profile.id.slice(0, 6)}/200/200`;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      <div className="relative bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="relative h-36 overflow-hidden">
+          <img src={`https://picsum.photos/seed/${coverSeed}/600/300`} alt="" className="w-full h-full object-cover scale-105" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+          <div className="absolute bottom-3 left-4 flex items-center gap-2.5">
+            <img src={avatarSrc} alt="" className="w-10 h-10 rounded-full border-2 border-white object-cover shadow" />
+            <div>
+              <div className="text-white font-bold text-sm">{profile.display_name}</div>
+              <div className="text-white/70 text-xs">{profile.niche ?? 'Creador'} · {profile.city ?? 'España'}</div>
+            </div>
+          </div>
+          <button onClick={onClose} className="absolute top-3 right-3 w-7 h-7 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/50 transition-colors text-lg leading-none">×</button>
+        </div>
+        <div className="p-5">
+          {sent ? (
+            <div className="text-center py-6">
+              <div className="text-4xl mb-3">🎉</div>
+              <div className="font-bold text-gray-900 mb-1">¡Solicitud enviada!</div>
+              <div className="text-sm text-gray-500 mb-5">
+                {profile.display_name} recibirá tu mensaje y podrá responder desde su panel.
+              </div>
+              <Button fullWidth size="md" onClick={onClose}><CheckCircle size={15} /> Entendido</Button>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                <div className="bg-gray-50 rounded-xl p-2.5 text-center">
+                  <div className="text-sm font-bold text-gray-900">{formatK(profile.followers_ig ?? 0)}</div>
+                  <div className="text-xs text-gray-400">Seguidores</div>
+                </div>
+                <div className="bg-emerald-50 rounded-xl p-2.5 text-center">
+                  <div className="text-sm font-bold text-emerald-600">{profile.engagement_rate_ig?.toFixed(1) ?? '—'}%</div>
+                  <div className="text-xs text-gray-400">Engagement</div>
+                </div>
+                <div className="bg-violet-50 rounded-xl p-2.5 text-center">
+                  <div className="text-sm font-bold text-violet-700">{profile.price_min ?? '—'}€</div>
+                  <div className="text-xs text-gray-400">Desde</div>
+                </div>
+              </div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                Cuéntale sobre tu campaña <span className="text-gray-400 font-normal">(opcional)</span>
+              </label>
+              <textarea
+                value={message}
+                onChange={e => setMessage(e.target.value)}
+                placeholder="Tipo de colaboración, producto, fechas aproximadas…"
+                rows={3}
+                className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none mb-4"
+              />
+              <Button fullWidth size="md" loading={sending} onClick={handleSubmit}>
+                <Send size={15} /> Enviar solicitud
+              </Button>
+              <p className="text-center text-xs text-gray-400 mt-2">
+                {profile.display_name} podrá aceptar desde su panel de Connectly
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function CreatorProfilePage() {
@@ -68,8 +140,20 @@ export default function CreatorProfilePage() {
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
-
   const [notFound, setNotFound] = useState(false);
+  const [showContact, setShowContact] = useState(false);
+  const [chatLoading, setChatLoading] = useState(false);
+
+  const handleOpenChat = async () => {
+    if (!user?.id || !profile) return;
+    setChatLoading(true);
+    try {
+      const conv = await getOrCreateDirectConversation(user.id, profile.id);
+      router.push(`/chat/direct/${conv.id}`);
+    } catch {
+      setChatLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -80,7 +164,6 @@ export default function CreatorProfilePage() {
           return;
         }
         if (data.user_type !== 'influencer') {
-          // Si es una marca, redirigir a su perfil de marca
           router.replace(`/brands/${id}`);
           return;
         }
@@ -133,14 +216,21 @@ export default function CreatorProfilePage() {
   const isGuest = !user;
   const isBrand = user?.user_metadata?.user_type === 'brand';
 
-  const stats = NICHE_STATS[profile.niche ?? ''] ?? NICHE_STATS.default;
+  const avatarSrc = profile.avatar_url ?? `https://picsum.photos/seed/avatar-${profile.id.slice(0, 6)}/200/200`;
+  const coverSeed = `cover-${profile.id.slice(0, 6)}`;
   const portfolioPics = getPortfolioPics(profile.id.slice(0, 8));
-  const realReviews = reviews.length > 0 ? reviews : MOCK_REVIEWS;
+
+  const followersDisplay = profile.followers_ig ? formatK(profile.followers_ig) : '—';
+  const erDisplay = profile.engagement_rate_ig ? `${profile.engagement_rate_ig.toFixed(1)}%` : '—';
+  const avgReachDisplay = profile.followers_ig && profile.engagement_rate_ig
+    ? formatK(Math.round(profile.followers_ig * (profile.engagement_rate_ig / 100)))
+    : '—';
+
   const avgRating = reviews.length > 0
     ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
-    : '4.8';
-  const coverSeed = `cover-${profile.id.slice(0, 6)}`;
-  const avatarSeed = `avatar-${profile.id.slice(0, 6)}`;
+    : profile.rating_avg > 0 ? profile.rating_avg.toFixed(1) : '4.8';
+
+  const handle = profile.instagram_handle ? `@${profile.instagram_handle}` : null;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -155,10 +245,8 @@ export default function CreatorProfilePage() {
             <ArrowLeft size={20} />
           </button>
           <span className="text-sm font-semibold text-gray-900 flex-1 truncate">{profile.display_name}</span>
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center">
-              <span className="text-white font-bold text-xs">C</span>
-            </div>
+          <Link href="/" className="flex items-center">
+            <img src="/mark-only.svg" alt="Connectly" className="h-6 w-auto" />
           </Link>
         </div>
       </div>
@@ -179,7 +267,7 @@ export default function CreatorProfilePage() {
           <div className="absolute -bottom-12 left-5">
             <div className="w-24 h-24 rounded-2xl border-4 border-white shadow-lg overflow-hidden bg-white">
               <img
-                src={`https://picsum.photos/seed/${avatarSeed}/200/200`}
+                src={avatarSrc}
                 alt={profile.display_name}
                 className="w-full h-full object-cover"
               />
@@ -212,6 +300,9 @@ export default function CreatorProfilePage() {
               {profile.niche && (
                 <Badge variant="default" size="sm">{profile.niche}</Badge>
               )}
+              {handle && (
+                <span className="text-xs text-violet-600 font-medium">{handle}</span>
+              )}
               {profile.city && (
                 <span className="flex items-center gap-1 text-xs text-gray-400">
                   <MapPin size={11} /> {profile.city}
@@ -226,9 +317,9 @@ export default function CreatorProfilePage() {
               <Button size="sm" variant="outline">Editar perfil</Button>
             </Link>
           ) : isBrand ? (
-            <Link href="/discover">
-              <Button size="sm">Contactar</Button>
-            </Link>
+            <Button size="sm" loading={chatLoading} onClick={handleOpenChat}>
+              <MessageCircle size={14} /> Chat directo
+            </Button>
           ) : isGuest ? (
             <Link href="/register">
               <Button size="sm">Regístrate gratis</Button>
@@ -238,39 +329,34 @@ export default function CreatorProfilePage() {
 
         {/* ── Stats ── */}
         <div className="grid grid-cols-3 gap-3 mt-6">
-          <StatBox icon={<Users size={16} className="text-violet-600" />} label="Seguidores" value={stats.followers} />
-          <StatBox icon={<TrendingUp size={16} className="text-emerald-600" />} label="Engagement" value={stats.er} />
-          <StatBox icon={<BarChart3 size={16} className="text-amber-600" />} label="Alcance medio" value={stats.avgReach} />
+          <StatBox icon={<Users size={16} className="text-violet-600" />} label="Seguidores" value={followersDisplay} />
+          <StatBox icon={<TrendingUp size={16} className="text-emerald-600" />} label="Engagement" value={erDisplay} />
+          <StatBox icon={<BarChart3 size={16} className="text-amber-600" />} label="Alcance medio" value={avgReachDisplay} />
         </div>
 
         {/* ── Sobre mí ── */}
         <section className="mt-8">
           <h2 className="text-sm font-bold text-gray-900 mb-2">Sobre mí</h2>
           <p className="text-sm text-gray-600 leading-relaxed">
-            Creador de contenido especializado en {profile.niche ?? 'contenido digital'}.
-            Colaboro con marcas auténticas que encajan con mi comunidad para crear contenido que conecta de verdad.
-            {profile.city ? ` Basado en ${profile.city}.` : ''}
+            {profile.bio ?? `Creador de contenido especializado en ${profile.niche ?? 'contenido digital'}. Colaboro con marcas auténticas que encajan con mi comunidad para crear contenido que conecta de verdad.${profile.city ? ` Basado en ${profile.city}.` : ''}`}
           </p>
         </section>
 
         {/* ── Tarifas (solo marcas y propio) ── */}
-        {(isBrand || isOwn) && (
+        {(isBrand || isOwn) && (profile.price_min || profile.price_max) && (
           <section className="mt-6 bg-violet-50 border border-violet-100 rounded-2xl p-4">
             <h2 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-1.5">
               <BarChart3 size={14} className="text-violet-600" /> Tarifas orientativas
             </h2>
             <div className="grid grid-cols-2 gap-2">
-              {[
-                { tipo: 'Story (x3)', precio: '80–150€' },
-                { tipo: 'Reel / Video', precio: '200–400€' },
-                { tipo: 'Post feed', precio: '120–250€' },
-                { tipo: 'Pack campaña', precio: 'desde 500€' },
-              ].map(r => (
-                <div key={r.tipo} className="bg-white rounded-xl px-3 py-2.5 border border-violet-100">
-                  <div className="text-xs text-gray-500">{r.tipo}</div>
-                  <div className="text-sm font-bold text-gray-900">{r.precio}</div>
-                </div>
-              ))}
+              <div className="bg-white rounded-xl px-3 py-2.5 border border-violet-100">
+                <div className="text-xs text-gray-500">Desde</div>
+                <div className="text-sm font-bold text-gray-900">{profile.price_min ?? '—'}€</div>
+              </div>
+              <div className="bg-white rounded-xl px-3 py-2.5 border border-violet-100">
+                <div className="text-xs text-gray-500">Hasta</div>
+                <div className="text-sm font-bold text-gray-900">{profile.price_max ?? '—'}€</div>
+              </div>
             </div>
           </section>
         )}
@@ -294,25 +380,19 @@ export default function CreatorProfilePage() {
             <div className="flex items-center gap-1.5">
               <Stars rating={Math.round(Number(avgRating))} />
               <span className="text-xs font-bold text-gray-700">{avgRating}</span>
-              <span className="text-xs text-gray-400">({realReviews.length})</span>
+              <span className="text-xs text-gray-400">({reviews.length > 0 ? reviews.length : profile.total_reviews})</span>
             </div>
           </div>
-          {realReviews.length === 0 ? (
+          {reviews.length === 0 ? (
             <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-6 text-center">
               <p className="text-xs text-gray-400">Aún no hay reseñas. Se publicarán tras las primeras colaboraciones.</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {realReviews.map((r, i) => {
-                const isReal = reviews.length > 0;
-                const name = isReal
-                  ? (r as Review & { reviewer?: { display_name: string } | null }).reviewer?.display_name ?? 'Marca'
-                  : (r as typeof MOCK_REVIEWS[0]).brand;
-                const logo = isReal ? `https://picsum.photos/seed/rev-${String(r.id).slice(0, 6)}/40/40` : (r as typeof MOCK_REVIEWS[0]).logo;
-                const text = isReal ? (r as Review).comment ?? '' : (r as typeof MOCK_REVIEWS[0]).text;
-                const date = isReal
-                  ? new Date((r as Review).created_at).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
-                  : (r as typeof MOCK_REVIEWS[0]).date;
+              {reviews.map((r, i) => {
+                const name = (r as Review & { reviewer?: { display_name: string } | null }).reviewer?.display_name ?? 'Marca';
+                const logo = `https://picsum.photos/seed/rev-${String(r.id).slice(0, 6)}/40/40`;
+                const date = new Date(r.created_at).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
                 return (
                   <div key={r.id ?? i} className="bg-white border border-gray-100 shadow-sm rounded-2xl p-4">
                     <div className="flex items-center gap-3 mb-2">
@@ -323,12 +403,12 @@ export default function CreatorProfilePage() {
                       </div>
                       <span className="ml-auto text-xs text-gray-400">{date}</span>
                     </div>
-                    {text && <p className="text-xs text-gray-600 leading-relaxed">{text}</p>}
-                    {isReal && (r as Review).would_repeat !== null && (
+                    {r.comment && <p className="text-xs text-gray-600 leading-relaxed">{r.comment}</p>}
+                    {r.would_repeat !== null && (
                       <span className={`inline-flex items-center gap-1 mt-2 text-[10px] font-medium px-2 py-0.5 rounded-full ${
-                        (r as Review).would_repeat ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'
+                        r.would_repeat ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'
                       }`}>
-                        {(r as Review).would_repeat ? '👍 Repetiría' : '👎 No repetiría'}
+                        {r.would_repeat ? '👍 Repetiría' : '👎 No repetiría'}
                       </span>
                     )}
                   </div>
@@ -338,7 +418,7 @@ export default function CreatorProfilePage() {
           )}
         </section>
 
-        {/* ── CTA bottom (guest) ── */}
+        {/* ── CTA bottom (guest / brand) ── */}
         {isGuest && (
           <div className="mt-10 bg-gradient-to-r from-violet-600 to-violet-800 rounded-2xl p-5 text-center">
             <div className="text-white font-bold mb-1">¿Eres una marca?</div>
@@ -351,7 +431,28 @@ export default function CreatorProfilePage() {
           </div>
         )}
 
+        {isBrand && (
+          <div className="mt-10 bg-gradient-to-r from-violet-600 to-violet-800 rounded-2xl p-5 flex items-center justify-between gap-4">
+            <div>
+              <div className="text-white font-bold mb-1">¿Te interesa este creador?</div>
+              <div className="text-violet-200 text-sm">Abre un chat directo y coordina la colaboración.</div>
+            </div>
+            <Button
+              variant="outline"
+              className="border-white/40 text-white hover:bg-white/10 flex-shrink-0"
+              loading={chatLoading}
+              onClick={handleOpenChat}
+            >
+              <MessageCircle size={13} /> Chatear
+            </Button>
+          </div>
+        )}
+
       </div>
+
+      {showContact && profile && (
+        <ContactModal profile={profile} onClose={() => setShowContact(false)} />
+      )}
     </div>
   );
 }

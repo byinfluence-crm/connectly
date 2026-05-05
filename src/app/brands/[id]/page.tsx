@@ -128,10 +128,8 @@ export default function BrandProfilePage() {
             <ArrowLeft size={20} />
           </button>
           <span className="text-sm font-semibold text-gray-900 flex-1 truncate">{profile.display_name}</span>
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center">
-              <span className="text-white font-bold text-xs">C</span>
-            </div>
+          <Link href="/" className="flex items-center">
+            <img src="/mark-only.svg" alt="Connectly" className="h-6 w-auto" />
           </Link>
         </div>
       </div>

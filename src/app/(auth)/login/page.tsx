@@ -51,11 +51,8 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gray-50 flex">
       {/* Left panel */}
       <div className="hidden lg:flex w-[420px] flex-shrink-0 bg-gradient-to-br from-violet-700 to-violet-900 p-10 flex-col justify-between">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
-            <span className="text-white font-bold text-sm">C</span>
-          </div>
-          <span className="font-bold text-white text-lg">Connectly</span>
+        <Link href="/">
+          <img src="/logo-horizontal.svg" alt="Connectly" className="h-8 w-auto brightness-0 invert" />
         </Link>
         <div>
           <h2 className="text-2xl font-bold text-white mb-4">Bienvenido de nuevo</h2>
@@ -69,11 +66,8 @@ export default function LoginPage() {
       {/* Right form */}
       <div className="flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-md">
-          <Link href="/" className="flex items-center gap-2 mb-8 lg:hidden">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center">
-              <span className="text-white font-bold text-sm">C</span>
-            </div>
-            <span className="font-bold text-gray-900 text-lg">Connectly</span>
+          <Link href="/" className="inline-flex mb-8 lg:hidden">
+            <img src="/logo-horizontal.svg" alt="Connectly" className="h-8 w-auto" />
           </Link>
 
           <div className="mb-8">

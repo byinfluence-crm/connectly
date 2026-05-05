@@ -83,11 +83,22 @@ export interface PublicProfile {
   display_name: string;
   city: string | null;
   niche: string | null;
-  /** Verificación: se trae del profile específico (brand_profiles o influencer_profiles) */
   is_verified: boolean;
-  /** Perfil destacado — por ahora siempre false, se activará cuando añadamos planes */
   is_boosted: boolean;
   created_at: string;
+  // Influencer-specific (populated when user_type === 'influencer')
+  bio: string | null;
+  avatar_url: string | null;
+  followers_ig: number;
+  engagement_rate_ig: number | null;
+  price_min: number | null;
+  price_max: number | null;
+  instagram_handle: string | null;
+  tiktok_handle: string | null;
+  niches: string[];
+  creator_type: 'influencer' | 'ugc' | 'both' | null;
+  rating_avg: number;
+  total_reviews: number;
 }
 
 /** Perfil público de cualquier usuario (une marketplace_users + profile específico). */
@@ -99,8 +110,13 @@ export async function getPublicProfile(userId: string): Promise<PublicProfile | 
     .maybeSingle();
   if (error || !mu) return null;
 
-  // Obtener is_verified del profile específico
   let isVerified = false;
+  let extraFields: Partial<PublicProfile> = {
+    bio: null, avatar_url: null, followers_ig: 0, engagement_rate_ig: null,
+    price_min: null, price_max: null, instagram_handle: null, tiktok_handle: null,
+    niches: [], creator_type: null, rating_avg: 0, total_reviews: 0,
+  };
+
   if (mu.user_type === 'brand') {
     const { data: bp } = await supabase
       .from('brand_profiles')
@@ -111,10 +127,26 @@ export async function getPublicProfile(userId: string): Promise<PublicProfile | 
   } else if (mu.user_type === 'influencer') {
     const { data: ip } = await supabase
       .from('influencer_profiles')
-      .select('is_verified')
+      .select('is_verified, bio, avatar_url, followers_ig, engagement_rate_ig, price_min, price_max, instagram_handle, tiktok_handle, niches, creator_type, rating_avg, total_reviews')
       .eq('user_id', userId)
       .maybeSingle();
     isVerified = ip?.is_verified ?? false;
+    if (ip) {
+      extraFields = {
+        bio: ip.bio ?? null,
+        avatar_url: ip.avatar_url ?? null,
+        followers_ig: ip.followers_ig ?? 0,
+        engagement_rate_ig: ip.engagement_rate_ig ?? null,
+        price_min: ip.price_min ?? null,
+        price_max: ip.price_max ?? null,
+        instagram_handle: ip.instagram_handle ?? null,
+        tiktok_handle: ip.tiktok_handle ?? null,
+        niches: ip.niches ?? [],
+        creator_type: ip.creator_type ?? null,
+        rating_avg: ip.rating_avg ?? 0,
+        total_reviews: ip.total_reviews ?? 0,
+      };
+    }
   }
 
   return {
@@ -126,7 +158,8 @@ export async function getPublicProfile(userId: string): Promise<PublicProfile | 
     is_verified: isVerified,
     is_boosted: false,
     created_at: mu.created_at ?? '',
-  };
+    ...extraFields,
+  } as PublicProfile;
 }
 
 // ─── Brand / Influencer Profiles ────────────────────────────────────────────
@@ -323,6 +356,52 @@ export async function deleteCollaboration(collabId: string): Promise<void> {
     .delete()
     .eq('id', collabId);
   if (error) throw error;
+}
+
+// ─── Discover — Influencer Profiles ────────────────────────────────────────
+
+/** Perfil público de influencer/UGC para /discover */
+export interface PublicInfluencerProfile {
+  id: string;
+  user_id: string;
+  display_name: string;
+  instagram_handle: string | null;
+  niches: string[];
+  city: string | null;
+  followers_ig: number;
+  engagement_rate_ig: number | null;
+  price_min: number | null;
+  price_max: number | null;
+  is_verified: boolean;
+  rating_avg: number;
+  total_reviews: number;
+  creator_type: 'influencer' | 'ugc' | 'both';
+  avatar_url: string | null;
+  bio: string | null;
+}
+
+export async function getPublicInfluencers(): Promise<PublicInfluencerProfile[]> {
+  const { data } = await supabase
+    .from('influencer_profiles')
+    .select('id, user_id, display_name, instagram_handle, niches, city, followers_ig, followers_tt, engagement_rate_ig, price_min, price_max, is_verified, rating_avg, total_reviews, creator_type, avatar_url, bio')
+    .in('creator_type', ['influencer', 'both'])
+    .not('instagram_handle', 'is', null)
+    .gt('followers_ig', 0)
+    .order('is_verified', { ascending: false })
+    .order('rating_avg', { ascending: false })
+    .order('total_reviews', { ascending: false });
+  return (data ?? []) as unknown as PublicInfluencerProfile[];
+}
+
+export async function getPublicUgcCreators(): Promise<PublicInfluencerProfile[]> {
+  const { data } = await supabase
+    .from('influencer_profiles')
+    .select('id, user_id, display_name, instagram_handle, niches, city, followers_ig, engagement_rate_ig, price_min, price_max, is_verified, rating_avg, total_reviews, creator_type, avatar_url, bio')
+    .in('creator_type', ['ugc', 'both'])
+    .order('is_verified', { ascending: false })
+    .order('rating_avg', { ascending: false })
+    .order('total_reviews', { ascending: false });
+  return (data ?? []) as unknown as PublicInfluencerProfile[];
 }
 
 /** Tipo para mostrar collabs en /discover con datos de la marca. */
@@ -1324,4 +1403,223 @@ export async function getBrandAnalytics(brandId: string) {
       submitted_at: string;
     } | null;
   }[];
+}
+
+// ─── Contact Requests ─────────────────────────────────────────────────────────
+
+export interface ContactRequest {
+  id: string;
+  brand_user_id: string;
+  creator_user_id: string;
+  message: string | null;
+  status: 'pending' | 'responded' | 'dismissed';
+  created_at: string;
+  other_name: string;
+  other_logo: string | null;
+}
+
+/** Obtiene solicitudes de contacto para el creador autenticado (lado cliente). */
+export async function getContactRequestsForCreator(creatorUserId: string): Promise<ContactRequest[]> {
+  const { data } = await supabase
+    .from('contact_requests')
+    .select('*')
+    .eq('creator_user_id', creatorUserId)
+    .order('created_at', { ascending: false });
+  return (data ?? []) as ContactRequest[];
+}
+
+/** Marca una solicitud de contacto como 'dismissed'. */
+export async function dismissContactRequest(requestId: string): Promise<void> {
+  await supabase
+    .from('contact_requests')
+    .update({ status: 'dismissed' })
+    .eq('id', requestId);
+}
+
+// ─── Direct Chat ──────────────────────────────────────────────────────────────
+
+export interface DirectConversation {
+  id: string;
+  brand_user_id: string;
+  creator_user_id: string;
+  last_message_at: string | null;
+  created_at: string;
+}
+
+export interface DirectMessage {
+  id: string;
+  direct_conversation_id: string;
+  sender_user_id: string;
+  content: string;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface DirectConversationEnriched extends DirectConversation {
+  other_id: string;
+  other_name: string;
+  other_avatar: string | null;
+  last_message_content: string | null;
+  last_message_mine: boolean | null;
+}
+
+/** Crea o devuelve la conversación directa entre una marca y un creador. */
+export async function getOrCreateDirectConversation(
+  brandUserId: string,
+  creatorUserId: string,
+): Promise<DirectConversation> {
+  const { data: existing } = await supabase
+    .from('direct_conversations')
+    .select('*')
+    .eq('brand_user_id', brandUserId)
+    .eq('creator_user_id', creatorUserId)
+    .maybeSingle();
+
+  if (existing) return existing as DirectConversation;
+
+  const { data, error } = await supabase
+    .from('direct_conversations')
+    .insert({ brand_user_id: brandUserId, creator_user_id: creatorUserId })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as DirectConversation;
+}
+
+/** Devuelve una conversación directa por ID, incluyendo info de ambos participantes. */
+export async function getDirectConversationById(id: string): Promise<
+  (DirectConversation & { brand_name: string; creator_name: string; brand_avatar: string | null; creator_avatar: string | null }) | null
+> {
+  const { data: conv } = await supabase
+    .from('direct_conversations')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (!conv) return null;
+
+  const { data: users } = await supabase
+    .from('marketplace_users')
+    .select('id, display_name')
+    .in('id', [conv.brand_user_id, conv.creator_user_id]);
+
+  const byId = new Map((users ?? []).map(u => [u.id, u]));
+
+  const { data: brandProfile } = await supabase
+    .from('brand_profiles')
+    .select('logo_url')
+    .eq('user_id', conv.brand_user_id)
+    .maybeSingle();
+
+  const { data: creatorProfile } = await supabase
+    .from('influencer_profiles')
+    .select('avatar_url')
+    .eq('user_id', conv.creator_user_id)
+    .maybeSingle();
+
+  return {
+    ...(conv as DirectConversation),
+    brand_name: byId.get(conv.brand_user_id)?.display_name ?? 'Marca',
+    creator_name: byId.get(conv.creator_user_id)?.display_name ?? 'Creador',
+    brand_avatar: brandProfile?.logo_url ?? null,
+    creator_avatar: creatorProfile?.avatar_url ?? null,
+  };
+}
+
+/** Historial de mensajes de una conversación directa. */
+export async function getDirectMessages(conversationId: string): Promise<DirectMessage[]> {
+  const { data } = await supabase
+    .from('direct_messages')
+    .select('*')
+    .eq('direct_conversation_id', conversationId)
+    .order('created_at', { ascending: true });
+  return (data ?? []) as DirectMessage[];
+}
+
+/** Envía un mensaje directo y actualiza last_message_at. */
+export async function sendDirectMessage(
+  conversationId: string,
+  senderUserId: string,
+  content: string,
+): Promise<DirectMessage> {
+  const { data, error } = await supabase
+    .from('direct_messages')
+    .insert({ direct_conversation_id: conversationId, sender_user_id: senderUserId, content })
+    .select()
+    .single();
+  if (error) throw error;
+
+  const msg = data as DirectMessage;
+  await supabase
+    .from('direct_conversations')
+    .update({ last_message_at: msg.created_at })
+    .eq('id', conversationId);
+
+  return msg;
+}
+
+/** Lista todas las conversaciones directas de un usuario, enriquecidas con el nombre del otro. */
+export async function getDirectConversationsForUser(
+  userId: string,
+): Promise<DirectConversationEnriched[]> {
+  const { data: convs } = await supabase
+    .from('direct_conversations')
+    .select('*')
+    .or(`brand_user_id.eq.${userId},creator_user_id.eq.${userId}`)
+    .order('last_message_at', { ascending: false, nullsFirst: false });
+
+  if (!convs?.length) return [];
+
+  const brandOtherIds = convs.filter(c => c.creator_user_id === userId).map(c => c.brand_user_id);
+  const creatorOtherIds = convs.filter(c => c.brand_user_id === userId).map(c => c.creator_user_id);
+  const allOtherIds = [...new Set([...brandOtherIds, ...creatorOtherIds])];
+
+  const { data: users } = await supabase
+    .from('marketplace_users')
+    .select('id, display_name')
+    .in('id', allOtherIds);
+
+  const [{ data: brandAvatars }, { data: creatorAvatars }, { data: lastMsgs }] = await Promise.all([
+    brandOtherIds.length
+      ? supabase.from('brand_profiles').select('user_id, logo_url').in('user_id', brandOtherIds)
+      : Promise.resolve({ data: [] }),
+    creatorOtherIds.length
+      ? supabase.from('influencer_profiles').select('user_id, avatar_url').in('user_id', creatorOtherIds)
+      : Promise.resolve({ data: [] }),
+    supabase
+      .from('direct_messages')
+      .select('direct_conversation_id, content, sender_user_id, created_at')
+      .in('direct_conversation_id', convs.map(c => c.id))
+      .order('created_at', { ascending: false }),
+  ]);
+
+  const lastMsgMap = new Map<string, { content: string; sender_user_id: string }>();
+  for (const m of lastMsgs ?? []) {
+    if (!lastMsgMap.has(m.direct_conversation_id)) {
+      lastMsgMap.set(m.direct_conversation_id, m);
+    }
+  }
+
+  const usersMap = new Map((users ?? []).map(u => [u.id, u]));
+  const brandAvatarMap = new Map((brandAvatars ?? []).map(b => [b.user_id, b.logo_url]));
+  const creatorAvatarMap = new Map((creatorAvatars ?? []).map(c => [c.user_id, c.avatar_url]));
+
+  return convs.map(c => {
+    const isBrand = c.brand_user_id === userId;
+    const otherId = isBrand ? c.creator_user_id : c.brand_user_id;
+    const other = usersMap.get(otherId);
+    const lastMsg = lastMsgMap.get(c.id);
+    const otherAvatar = isBrand
+      ? (creatorAvatarMap.get(otherId) ?? null)
+      : (brandAvatarMap.get(otherId) ?? null);
+    return {
+      ...(c as DirectConversation),
+      other_id: otherId,
+      other_name: other?.display_name ?? 'Usuario',
+      other_avatar: otherAvatar,
+      last_message_content: lastMsg?.content ?? null,
+      last_message_mine: lastMsg ? lastMsg.sender_user_id === userId : null,
+    };
+  });
 }

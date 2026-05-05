@@ -161,9 +161,17 @@ export default function CreatorAnalyticsPage() {
       }));
   })();
 
-  // Score (mock hasta que exista tabla influencer_scores)
-  const score = MOCK_SCORE;
-  const benchmark = MOCK_BENCHMARK;
+  // Score: derivado de reseñas reales si las hay
+  const score = (() => {
+    if (reviews.length === 0) return MOCK_SCORE;
+    const ratingScore = (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length / 5) * 50;
+    const deliveryScore = Math.min(deliveries.length * 4, 30);
+    const repeatScore = reviews.length > 0
+      ? (reviews.filter(r => r.would_repeat).length / reviews.length) * 20
+      : 10;
+    return Math.min(100, Math.round(ratingScore + deliveryScore + repeatScore));
+  })();
+  const benchmark = reviews.length > 0 ? Math.max(score - 5, 50) : MOCK_BENCHMARK;
 
   // Detección de áreas de mejora desde reseñas
   const improvementAreas = (() => {

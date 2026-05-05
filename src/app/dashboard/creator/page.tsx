@@ -9,7 +9,7 @@ import {
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import { useAuth } from '@/components/AuthProvider';
-import { getApplicationsByCreator, getPublicCollaborations } from '@/lib/supabase';
+import { getApplicationsByCreator, getPublicCollaborations, getContactRequestsForCreator } from '@/lib/supabase';
 import type { ApplicationWithCollab, PublicCollaboration } from '@/lib/supabase';
 import DeliveryModal from '@/components/DeliveryModal';
 
@@ -45,6 +45,7 @@ export default function CreatorDashboard() {
   const [loadingApps, setLoadingApps] = useState(true);
   const [deliveryApp, setDeliveryApp] = useState<ApplicationWithCollab | null>(null);
   const [availableCollabs, setAvailableCollabs] = useState<PublicCollaboration[]>([]);
+  const [pendingContacts, setPendingContacts] = useState(0);
 
   const displayName = (user?.user_metadata?.display_name as string) ?? 'Creador';
 
@@ -63,6 +64,14 @@ export default function CreatorDashboard() {
       .then(cs => setAvailableCollabs(cs.slice(0, 6)))
       .catch(console.error);
   }, []);
+
+  // Contar solicitudes de contacto directas pendientes
+  useEffect(() => {
+    if (!user?.id) return;
+    getContactRequestsForCreator(user.id)
+      .then(reqs => setPendingContacts(reqs.filter(r => r.status === 'pending').length))
+      .catch(console.error);
+  }, [user?.id]);
 
   const totalSent = applications.length;
   const accepted = applications.filter(a => a.status === 'accepted').length;
@@ -126,6 +135,26 @@ export default function CreatorDashboard() {
               highlight={pending > 0}
             />
           </div>
+
+          {/* ── Banner solicitudes directas de marcas ── */}
+          {pendingContacts > 0 && (
+            <Link href="/dashboard/creator/messages">
+              <div className="bg-violet-50 border border-violet-200 rounded-2xl p-4 flex items-center gap-4 hover:bg-violet-100 transition-colors cursor-pointer">
+                <div className="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+                  {pendingContacts}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-bold text-gray-900">
+                    {pendingContacts === 1 ? 'Una marca quiere contactarte' : `${pendingContacts} marcas quieren contactarte`}
+                  </div>
+                  <div className="text-xs text-violet-700">
+                    Revisa las solicitudes directas en tu bandeja de mensajes
+                  </div>
+                </div>
+                <ChevronRight size={16} className="text-violet-600 flex-shrink-0" />
+              </div>
+            </Link>
+          )}
 
           {/* ── Colaboraciones disponibles ── */}
           <section>

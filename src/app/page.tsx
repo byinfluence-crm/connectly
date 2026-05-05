@@ -619,11 +619,8 @@ export default function HomePage() {
         <div className="max-w-5xl mx-auto">
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
             <div>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center">
-                  <span className="text-white font-bold text-xs">C</span>
-                </div>
-                <span className="text-white font-bold text-sm">Connectly</span>
+              <div className="mb-4">
+                <img src="/logo-horizontal.svg" alt="Connectly" className="h-7 w-auto brightness-0 invert" />
               </div>
               <p className="text-xs leading-relaxed">La plataforma de influencer marketing más rápida de España.</p>
             </div>

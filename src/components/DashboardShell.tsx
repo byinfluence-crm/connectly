@@ -25,10 +25,11 @@ const BRAND_NAV: NavItem[] = [
 ];
 
 const ADMIN_NAV: NavItem[] = [
-  { label: 'Panel de agencia', href: '/dashboard/admin',                  icon: LayoutDashboard },
-  { label: 'Mis marcas',       href: '/dashboard/admin',                  icon: Building2 },
-  { label: 'Mi perfil',        href: '/dashboard/admin/settings/profile', icon: User },
-  { label: 'Facturación',      href: '/dashboard/admin/settings/billing', icon: CreditCard },
+  { label: 'Panel de agencia', href: '/dashboard/admin',                   icon: LayoutDashboard },
+  { label: 'Mis marcas',       href: '/dashboard/admin',                   icon: Building2 },
+  { label: 'Creadores',        href: '/dashboard/admin/creators',          icon: Users },
+  { label: 'Mi perfil',        href: '/dashboard/admin/settings/profile',  icon: User },
+  { label: 'Facturación',      href: '/dashboard/admin/settings/billing',  icon: CreditCard },
 ];
 
 const creatorNav = (_userId: string): NavItem[] => [
@@ -96,12 +97,9 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const sidebarContent = (
     <>
       {/* Logo */}
-      <div className="h-16 flex items-center gap-2 px-5 border-b border-gray-100 shrink-0">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center">
-            <span className="text-white font-bold text-sm">C</span>
-          </div>
-          <span className="font-bold text-gray-900 text-lg">Connectly</span>
+      <div className="h-16 flex items-center px-5 border-b border-gray-100 shrink-0">
+        <Link href="/">
+          <img src="/logo-horizontal.svg" alt="Connectly" className="h-7 w-auto" />
         </Link>
       </div>
 
@@ -171,11 +169,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         >
           <Menu size={22} className="text-gray-700" />
         </button>
-        <Link href="/" className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center">
-            <span className="text-white font-bold text-xs">C</span>
-          </div>
-          <span className="font-bold text-gray-900">Connectly</span>
+        <Link href="/">
+          <img src="/logo-horizontal.svg" alt="Connectly" className="h-6 w-auto" />
         </Link>
       </header>
 

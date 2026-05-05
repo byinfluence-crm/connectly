@@ -116,11 +116,8 @@ export default function BlogPage() {
       {/* Navbar mínima */}
       <div className="bg-white border-b border-gray-100 sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center gap-4">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center">
-              <span className="text-white font-bold text-xs">C</span>
-            </div>
-            <span className="font-bold text-gray-900 tracking-tight">Connectly</span>
+          <Link href="/" className="flex items-center">
+            <img src="/logo-horizontal.svg" alt="Connectly" className="h-6 w-auto" />
           </Link>
           <span className="text-gray-300">/</span>
           <span className="text-sm text-gray-500">Blog</span>

@@ -11,11 +11,8 @@ export default function AboutPage() {
           <ArrowLeft size={16} /> Volver
         </Link>
 
-        <div className="flex items-center gap-3 mb-10">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center">
-            <span className="text-white font-bold text-sm">C</span>
-          </div>
-          <span className="text-2xl font-bold text-gray-900">Connectly</span>
+        <div className="mb-10">
+          <img src="/logo-horizontal.svg" alt="Connectly" className="h-9 w-auto" />
         </div>
 
         <h1 className="text-3xl font-bold text-gray-900 mb-4">El marketplace de influencers más transparente de España</h1>
