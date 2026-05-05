@@ -4,9 +4,10 @@ import { useAuth } from '@/components/AuthProvider';
 import { getBrandProfileByUserId, updateBrandProfile } from '@/lib/supabase';
 import { authFetch } from '@/lib/auth-fetch';
 import type { BrandProfile, BrandLocation } from '@/lib/supabase';
+import Link from 'next/link';
 import {
   Camera, Plus, Trash2, MapPin, AtSign, Globe,
-  Loader2, CheckCircle2, AlertCircle, Music2,
+  Loader2, CheckCircle2, AlertCircle, Music2, ExternalLink,
 } from 'lucide-react';
 
 const SECTORS     = ['Gastronomía', 'Moda', 'Fitness', 'Viajes', 'Belleza', 'Tecnología', 'Hostelería', 'Retail', 'Salud', 'Otro'];
@@ -33,6 +34,7 @@ export default function BrandProfilePage() {
 
   const coverInputRef   = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef    = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
     brand_name:    '',
@@ -46,13 +48,15 @@ export default function BrandProfilePage() {
     instagram_url: '',
     tiktok_url:    '',
     schedule:      '',
-    cover_photo_url: '' as string | null,
+    logo_url:        null as string | null,
+    cover_photo_url: null as string | null,
     gallery_urls:  [] as string[],
     locations:     [] as BrandLocation[],
   });
 
   const [uploadingCover,   setUploadingCover]   = useState(false);
   const [uploadingGallery, setUploadingGallery] = useState(false);
+  const [uploadingLogo,    setUploadingLogo]    = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -71,6 +75,7 @@ export default function BrandProfilePage() {
           instagram_url:   p.instagram_url   ?? '',
           tiktok_url:      p.tiktok_url      ?? '',
           schedule:        p.schedule        ?? '',
+          logo_url:        p.logo_url        ?? null,
           cover_photo_url: p.cover_photo_url ?? null,
           gallery_urls:    p.gallery_urls    ?? [],
           locations:       p.locations       ?? [],
@@ -78,6 +83,17 @@ export default function BrandProfilePage() {
       }
     }).finally(() => setLoading(false));
   }, [user]);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingLogo(true);
+    try {
+      const url = await uploadImage(file, 'logo');
+      setForm(f => ({ ...f, logo_url: url }));
+    } catch (e) { setError(e instanceof Error ? e.message : 'Error subiendo el logo'); }
+    finally { setUploadingLogo(false); }
+  };
 
   const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -138,6 +154,7 @@ export default function BrandProfilePage() {
         instagram_url:   form.instagram_url || null,
         tiktok_url:      form.tiktok_url   || null,
         schedule:        form.schedule     || null,
+        logo_url:        form.logo_url,
         cover_photo_url: form.cover_photo_url,
         gallery_urls:    form.gallery_urls,
         locations:       form.locations,
@@ -162,19 +179,30 @@ export default function BrandProfilePage() {
   return (
     <div className="p-6 max-w-3xl mx-auto pb-24">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-start justify-between mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Perfil de marca</h1>
           <p className="text-sm text-gray-500 mt-0.5">Información visible para los creadores</p>
         </div>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="flex items-center gap-2 bg-violet-600 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-violet-700 disabled:opacity-60 transition-colors"
-        >
-          {saving ? <Loader2 size={15} className="animate-spin" /> : saved ? <CheckCircle2 size={15} /> : null}
-          {saving ? 'Guardando...' : saved ? 'Guardado' : 'Guardar cambios'}
-        </button>
+        <div className="flex items-center gap-3 shrink-0">
+          {user && (
+            <Link
+              href={`/brands/${user.id}`}
+              target="_blank"
+              className="flex items-center gap-1.5 text-sm text-violet-600 font-medium hover:text-violet-700 px-3 py-2.5 rounded-xl hover:bg-violet-50 transition-colors"
+            >
+              <ExternalLink size={14} /> Ver perfil público
+            </Link>
+          )}
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 bg-violet-600 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-violet-700 disabled:opacity-60 transition-colors"
+          >
+            {saving ? <Loader2 size={15} className="animate-spin" /> : saved ? <CheckCircle2 size={15} /> : null}
+            {saving ? 'Guardando...' : saved ? 'Guardado' : 'Guardar cambios'}
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -263,6 +291,40 @@ export default function BrandProfilePage() {
         {/* ── Sección 2: Fotos ── */}
         <section className="bg-white rounded-2xl border border-gray-100 p-6">
           <h2 className="font-semibold text-gray-900 mb-5">Fotos</h2>
+
+          {/* Logo */}
+          <div className="mb-6 pb-6 border-b border-gray-100 flex items-center gap-5">
+            <div
+              onClick={() => !uploadingLogo && logoInputRef.current?.click()}
+              className="relative w-20 h-20 rounded-2xl border-2 border-dashed border-gray-200 hover:border-violet-400 transition-colors overflow-hidden cursor-pointer shrink-0 bg-gray-50 flex items-center justify-center group"
+            >
+              {form.logo_url ? (
+                <>
+                  <img src={form.logo_url} alt="Logo" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    {uploadingLogo ? <Loader2 size={18} className="text-white animate-spin" /> : <Camera size={18} className="text-white" />}
+                  </div>
+                </>
+              ) : uploadingLogo ? (
+                <Loader2 size={20} className="text-violet-500 animate-spin" />
+              ) : (
+                <Camera size={20} className="text-gray-400" />
+              )}
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-700">Logo de la marca</p>
+              <p className="text-xs text-gray-400 mt-0.5">JPG o PNG · Fondo blanco recomendado · Máx. 10 MB</p>
+              <button
+                type="button"
+                onClick={() => !uploadingLogo && logoInputRef.current?.click()}
+                disabled={uploadingLogo}
+                className="text-xs text-violet-600 font-medium mt-2 hover:text-violet-700 disabled:opacity-50"
+              >
+                {uploadingLogo ? 'Subiendo...' : form.logo_url ? 'Cambiar logo' : 'Subir logo'}
+              </button>
+            </div>
+            <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+          </div>
 
           {/* Portada */}
           <div className="mb-6">
