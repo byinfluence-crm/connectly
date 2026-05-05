@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
 
   const { data: profile } = await supabaseAdmin
     .from('influencer_profiles')
-    .select('display_name, bio, avatar_url, city, instagram_handle, tiktok_handle, followers_ig, followers_tt, niches, price_min, price_max, creator_type, fiscal_name, fiscal_nif, fiscal_address, billing_email')
+    .select('display_name, bio, avatar_url, city, instagram_handle, tiktok_handle, followers_ig, followers_tt, niches, price_min, price_max, creator_type, fiscal_name, fiscal_nif, fiscal_address, billing_email, portfolio_urls')
     .eq('user_id', auth.userId)
     .maybeSingle();
 
@@ -41,6 +41,7 @@ const ALLOWED_FIELDS = [
   'instagram_handle', 'tiktok_handle', 'followers_ig', 'followers_tt',
   'niches', 'price_min', 'price_max', 'creator_type',
   'fiscal_name', 'fiscal_nif', 'fiscal_address', 'billing_email',
+  'portfolio_urls',
 ];
 
 export async function PUT(req: NextRequest) {

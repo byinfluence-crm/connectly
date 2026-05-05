@@ -5,7 +5,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { authFetch } from '@/lib/auth-fetch';
 import Link from 'next/link';
 import {
-  Loader2, Save, CheckCircle2, AlertCircle, Camera, ExternalLink, RefreshCw,
+  Loader2, Save, CheckCircle2, AlertCircle, Camera, ExternalLink, RefreshCw, Plus, X,
 } from 'lucide-react';
 
 interface CreatorProfile {
@@ -25,6 +25,7 @@ interface CreatorProfile {
   fiscal_nif: string | null;
   fiscal_address: string | null;
   billing_email: string | null;
+  portfolio_urls: string[];
 }
 
 interface SyncStats {
@@ -75,6 +76,8 @@ export default function CreatorProfilePage() {
   const avatarRef = useRef<HTMLInputElement>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncStats, setSyncStats] = useState<SyncStats | null>(null);
+  const [portfolioUploading, setPortfolioUploading] = useState(false);
+  const portfolioRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -84,7 +87,8 @@ export default function CreatorProfilePage() {
         const p = d.profile;
         setProfile(p ? {
           ...p,
-          niches: p.niches ?? [],          // null-safe: DB puede devolver null
+          niches: p.niches ?? [],
+          portfolio_urls: p.portfolio_urls ?? [],
           followers_ig: p.followers_ig ?? 0,
           followers_tt: p.followers_tt ?? 0,
         } : {
@@ -104,6 +108,7 @@ export default function CreatorProfilePage() {
           fiscal_nif: null,
           fiscal_address: null,
           billing_email: null,
+          portfolio_urls: [],
         });
       })
       .catch(() => setError('No se pudo cargar el perfil. Recarga la página.'))
@@ -175,6 +180,40 @@ export default function CreatorProfilePage() {
     } finally {
       setSyncing(false);
     }
+  };
+
+  const handlePortfolioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length || !profile) return;
+    if ((profile.portfolio_urls.length + files.length) > 9) {
+      setError('Máximo 9 imágenes en el portfolio');
+      return;
+    }
+    setPortfolioUploading(true);
+    setError('');
+    try {
+      const uploaded: string[] = [];
+      for (const file of files) {
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('folder', 'portfolio');
+        const res = await authFetch('/api/creator/upload', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok || !data.url) throw new Error(data.error ?? 'Error al subir imagen');
+        uploaded.push(data.url);
+      }
+      setProfile({ ...profile, portfolio_urls: [...profile.portfolio_urls, ...uploaded] });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error subiendo imágenes');
+    } finally {
+      setPortfolioUploading(false);
+      if (portfolioRef.current) portfolioRef.current.value = '';
+    }
+  };
+
+  const removePortfolioImage = (url: string) => {
+    if (!profile) return;
+    setProfile({ ...profile, portfolio_urls: profile.portfolio_urls.filter(u => u !== url) });
   };
 
   const toggleNiche = (niche: string) => {
@@ -493,6 +532,49 @@ export default function CreatorProfilePage() {
               />
             </Field>
           </div>
+        </Section>
+
+        {/* Portfolio */}
+        <Section title="Portfolio">
+          <p className="text-xs text-gray-400 mb-4">
+            Sube hasta 9 imágenes de tu mejor contenido. Las marcas las verán en tu perfil público.
+          </p>
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            {profile.portfolio_urls.map(url => (
+              <div key={url} className="relative aspect-square group">
+                <img src={url} alt="" className="w-full h-full object-cover rounded-xl" />
+                <button
+                  type="button"
+                  onClick={() => removePortfolioImage(url)}
+                  className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+            {profile.portfolio_urls.length < 9 && (
+              <button
+                type="button"
+                onClick={() => !portfolioUploading && portfolioRef.current?.click()}
+                disabled={portfolioUploading}
+                className="aspect-square rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-1.5 text-gray-400 hover:border-violet-400 hover:text-violet-500 hover:bg-violet-50 transition-colors disabled:opacity-50"
+              >
+                {portfolioUploading
+                  ? <Loader2 size={20} className="animate-spin" />
+                  : <><Plus size={20} /><span className="text-[10px] font-medium">Añadir</span></>
+                }
+              </button>
+            )}
+          </div>
+          <input
+            ref={portfolioRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={handlePortfolioUpload}
+          />
+          <p className="text-xs text-gray-400">{profile.portfolio_urls.length}/9 imágenes · JPG, PNG · Máx. 10 MB por imagen</p>
         </Section>
 
         {/* Datos fiscales */}

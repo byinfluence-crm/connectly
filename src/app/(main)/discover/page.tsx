@@ -14,6 +14,7 @@ import {
 } from '@/lib/supabase';
 import { authFetch } from '@/lib/auth-fetch';
 import PlanLimitModal from '@/components/PlanLimitModal';
+import CreatorDrawer from '@/components/CreatorDrawer';
 import { useRouter } from 'next/navigation';
 import {
   Search, SlidersHorizontal, Star, Shield, Zap, MapPin,
@@ -369,7 +370,7 @@ function ContactModal({
 
 /* ─── INFLUENCER CARD ──────────────────────────────────────────────────────── */
 function InfluencerCard({
-  inf, featured, locked, credits, unlocking, onUnlock, isUnlocked, userId, userType,
+  inf, featured, locked, credits, unlocking, onUnlock, isUnlocked, userId, userType, onPreview,
 }: {
   inf: PublicInfluencerProfile;
   featured?: boolean;
@@ -380,6 +381,7 @@ function InfluencerCard({
   isUnlocked: boolean;
   userId: string | null;
   userType: string | null;
+  onPreview?: (inf: PublicInfluencerProfile) => void;
 }) {
   const router = useRouter();
   const showLocked = (locked ?? isLocked(inf)) && !isUnlocked;
@@ -391,15 +393,21 @@ function InfluencerCard({
   const cover = coverSeed(inf);
   const er = inf.engagement_rate_ig ?? 4.0;
 
-  const handleContactar = () => {
+  const handleContactar = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (!userId) { router.push('/login'); return; }
     setShowContact(true);
+  };
+
+  const handleCardClick = () => {
+    if (onPreview) { onPreview(inf); return; }
+    if (showLocked) setShowModal(true);
   };
 
   return (
     <>
       <div
-        onClick={() => showLocked && setShowModal(true)}
+        onClick={handleCardClick}
         className={`group bg-white rounded-2xl overflow-hidden border transition-all duration-200 hover:shadow-xl hover:-translate-y-0.5 cursor-pointer ${featured ? 'border-violet-300 ring-2 ring-violet-100 shadow-md' : 'border-gray-100 shadow-sm'}`}
       >
         <div className="relative h-44 sm:h-48 overflow-hidden bg-gray-100">
@@ -458,7 +466,7 @@ function InfluencerCard({
             </div>
           </div>
           {showLocked ? (
-            <Button variant="secondary" size="sm" fullWidth onClick={() => setShowModal(true)}><Lock size={13} /> Desbloquear perfil</Button>
+            <Button variant="secondary" size="sm" fullWidth onClick={(e: React.MouseEvent) => { e.stopPropagation(); setShowModal(true); }}><Lock size={13} /> Desbloquear perfil</Button>
           ) : (
             <Button variant={featured ? 'primary' : 'outline'} size="sm" fullWidth onClick={handleContactar}><MessageCircle size={13} /> Contactar</Button>
           )}
@@ -771,11 +779,25 @@ export default function DiscoverPage() {
     return () => { cancelled = true; };
   }, []);
 
+  const [drawerCreator, setDrawerCreator] = useState<PublicInfluencerProfile | null>(null);
+  const [drawerChatLoading, setDrawerChatLoading] = useState(false);
+
   const isUnlocked = (infId: string) => persistedUnlocked.has(infId);
 
   const handleUnlock = async (id: string) => {
     const result = await unlock(id);
     return result ?? { success: false };
+  };
+
+  const handleDrawerOpenChat = async (inf: PublicInfluencerProfile) => {
+    if (!user?.id) { router.push('/login'); return; }
+    setDrawerChatLoading(true);
+    try {
+      const conv = await getOrCreateDirectConversation(user.id, inf.user_id);
+      router.push(`/chat/direct/${conv.id}`);
+    } catch {
+      setDrawerChatLoading(false);
+    }
   };
 
   // Filters
@@ -813,6 +835,20 @@ export default function DiscoverPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
+
+      {drawerCreator && (
+        <CreatorDrawer
+          inf={drawerCreator}
+          isUnlocked={isUnlocked(drawerCreator.id)}
+          isBrand={userType === 'brand'}
+          userId={user?.id ?? null}
+          unlocking={unlocking}
+          onUnlock={handleUnlock}
+          onClose={() => setDrawerCreator(null)}
+          onOpenChat={handleDrawerOpenChat}
+          chatLoading={drawerChatLoading}
+        />
+      )}
 
       <div className="pt-16">
         {/* Sticky search bar */}
@@ -939,7 +975,7 @@ export default function DiscoverPage() {
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                       {featuredInfluencers.map(inf => (
-                        <InfluencerCard key={inf.id} inf={inf} featured credits={credits} unlocking={unlocking} onUnlock={handleUnlock} isUnlocked={isUnlocked(inf.id)} userId={user?.id ?? null} userType={userType} />
+                        <InfluencerCard key={inf.id} inf={inf} featured credits={credits} unlocking={unlocking} onUnlock={handleUnlock} isUnlocked={isUnlocked(inf.id)} userId={user?.id ?? null} userType={userType} onPreview={setDrawerCreator} />
                       ))}
                       {featuredUgc.map(c => (
                         <UgcCreatorCard key={c.id} creator={c} featured userType={userType} userId={user?.id ?? null} />
@@ -969,7 +1005,7 @@ export default function DiscoverPage() {
 
                   <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     {restInfluencers.map(inf => (
-                      <InfluencerCard key={inf.id} inf={inf} credits={credits} unlocking={unlocking} onUnlock={handleUnlock} isUnlocked={isUnlocked(inf.id)} userId={user?.id ?? null} userType={userType} />
+                      <InfluencerCard key={inf.id} inf={inf} credits={credits} unlocking={unlocking} onUnlock={handleUnlock} isUnlocked={isUnlocked(inf.id)} userId={user?.id ?? null} userType={userType} onPreview={setDrawerCreator} />
                     ))}
                     {restUgc.map(c => (
                       <UgcCreatorCard key={c.id} creator={c} userType={userType} userId={user?.id ?? null} />

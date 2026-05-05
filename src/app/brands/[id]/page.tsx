@@ -111,7 +111,7 @@ export default function BrandProfilePage() {
   const realReviews = reviews.length > 0 ? reviews : MOCK_REVIEWS;
   const avgRating = reviews.length > 0
     ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
-    : '4.8';
+    : profile.rating_avg > 0 ? profile.rating_avg.toFixed(1) : '4.8';
   const coverSeed = `brand-cover-${profile.id.slice(0, 6)}`;
   const logoSeed = `brand-logo-${profile.id.slice(0, 6)}`;
 
@@ -140,7 +140,7 @@ export default function BrandProfilePage() {
         <div className="relative mb-0">
           <div className="h-40 sm:h-52 w-full overflow-hidden rounded-b-3xl bg-gradient-to-br from-violet-400 to-violet-700">
             <img
-              src={`https://picsum.photos/seed/${coverSeed}/900/400`}
+              src={profile.cover_photo_url ?? `https://picsum.photos/seed/${coverSeed}/900/400`}
               alt="cover"
               className="w-full h-full object-cover opacity-60"
             />
@@ -149,11 +149,12 @@ export default function BrandProfilePage() {
           {/* Logo */}
           <div className="absolute -bottom-12 left-5">
             <div className="w-24 h-24 rounded-2xl border-4 border-white shadow-lg overflow-hidden bg-white">
-              <img
-                src={`https://picsum.photos/seed/${logoSeed}/200/200`}
-                alt={profile.display_name}
-                className="w-full h-full object-cover"
-              />
+              {profile.logo_url
+                ? <img src={profile.logo_url} alt={profile.display_name} className="w-full h-full object-cover" />
+                : <div className="w-full h-full bg-gradient-to-br from-violet-400 to-violet-700 flex items-center justify-center text-white text-3xl font-bold">
+                    {profile.display_name.charAt(0).toUpperCase()}
+                  </div>
+              }
             </div>
           </div>
 
@@ -211,11 +212,25 @@ export default function BrandProfilePage() {
         <section className="mt-6">
           <h2 className="text-sm font-bold text-gray-900 mb-2">Sobre la marca</h2>
           <p className="text-sm text-gray-600 leading-relaxed">
-            Marca especializada en {profile.niche ?? 'su sector'}.
-            Buscamos creadores auténticos que compartan nuestros valores para colaboraciones genuinas y a largo plazo.
-            {profile.city ? ` Operamos principalmente en ${profile.city} y alrededores.` : ''}
+            {profile.description
+              ? profile.description
+              : `Marca especializada en ${profile.niche ?? 'su sector'}. Buscamos creadores auténticos que compartan nuestros valores para colaboraciones genuinas y a largo plazo.${profile.city ? ` Operamos principalmente en ${profile.city} y alrededores.` : ''}`
+            }
           </p>
+          {profile.website && (
+            <a href={profile.website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-violet-600 font-medium mt-2 hover:underline">
+              <ExternalLink size={11} /> {profile.website.replace(/^https?:\/\//, '')}
+            </a>
+          )}
         </section>
+
+        {/* ── Collab brief ── */}
+        {profile.collab_brief && (
+          <section className="mt-5 bg-violet-50 border border-violet-100 rounded-2xl p-4">
+            <h2 className="text-sm font-bold text-gray-900 mb-1.5">¿Qué buscamos en un creador?</h2>
+            <p className="text-sm text-gray-600 leading-relaxed">{profile.collab_brief}</p>
+          </section>
+        )}
 
         {/* ── Rating ── */}
         <div className="mt-6 bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex items-center gap-4">

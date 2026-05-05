@@ -218,7 +218,9 @@ export default function CreatorProfilePage() {
 
   const avatarSrc = profile.avatar_url ?? `https://picsum.photos/seed/avatar-${profile.id.slice(0, 6)}/200/200`;
   const coverSeed = `cover-${profile.id.slice(0, 6)}`;
-  const portfolioPics = getPortfolioPics(profile.id.slice(0, 8));
+  const portfolioPics = profile.portfolio_urls.length > 0
+    ? profile.portfolio_urls
+    : getPortfolioPics(profile.id.slice(0, 8));
 
   const followersDisplay = profile.followers_ig ? formatK(profile.followers_ig) : '—';
   const erDisplay = profile.engagement_rate_ig ? `${profile.engagement_rate_ig.toFixed(1)}%` : '—';

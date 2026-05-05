@@ -86,7 +86,9 @@ export interface PublicProfile {
   is_verified: boolean;
   is_boosted: boolean;
   created_at: string;
-  // Influencer-specific (populated when user_type === 'influencer')
+  rating_avg: number;
+  total_reviews: number;
+  // Influencer-specific
   bio: string | null;
   avatar_url: string | null;
   followers_ig: number;
@@ -97,8 +99,13 @@ export interface PublicProfile {
   tiktok_handle: string | null;
   niches: string[];
   creator_type: 'influencer' | 'ugc' | 'both' | null;
-  rating_avg: number;
-  total_reviews: number;
+  portfolio_urls: string[];
+  // Brand-specific
+  logo_url: string | null;
+  cover_photo_url: string | null;
+  description: string | null;
+  website: string | null;
+  collab_brief: string | null;
 }
 
 /** Perfil público de cualquier usuario (une marketplace_users + profile específico). */
@@ -110,56 +117,70 @@ export async function getPublicProfile(userId: string): Promise<PublicProfile | 
     .maybeSingle();
   if (error || !mu) return null;
 
-  let isVerified = false;
-  let extraFields: Partial<PublicProfile> = {
-    bio: null, avatar_url: null, followers_ig: 0, engagement_rate_ig: null,
-    price_min: null, price_max: null, instagram_handle: null, tiktok_handle: null,
-    niches: [], creator_type: null, rating_avg: 0, total_reviews: 0,
-  };
-
-  if (mu.user_type === 'brand') {
-    const { data: bp } = await supabase
-      .from('brand_profiles')
-      .select('is_verified')
-      .eq('user_id', userId)
-      .maybeSingle();
-    isVerified = bp?.is_verified ?? false;
-  } else if (mu.user_type === 'influencer') {
-    const { data: ip } = await supabase
-      .from('influencer_profiles')
-      .select('is_verified, bio, avatar_url, followers_ig, engagement_rate_ig, price_min, price_max, instagram_handle, tiktok_handle, niches, creator_type, rating_avg, total_reviews')
-      .eq('user_id', userId)
-      .maybeSingle();
-    isVerified = ip?.is_verified ?? false;
-    if (ip) {
-      extraFields = {
-        bio: ip.bio ?? null,
-        avatar_url: ip.avatar_url ?? null,
-        followers_ig: ip.followers_ig ?? 0,
-        engagement_rate_ig: ip.engagement_rate_ig ?? null,
-        price_min: ip.price_min ?? null,
-        price_max: ip.price_max ?? null,
-        instagram_handle: ip.instagram_handle ?? null,
-        tiktok_handle: ip.tiktok_handle ?? null,
-        niches: ip.niches ?? [],
-        creator_type: ip.creator_type ?? null,
-        rating_avg: ip.rating_avg ?? 0,
-        total_reviews: ip.total_reviews ?? 0,
-      };
-    }
-  }
-
-  return {
+  const base = {
     id: mu.id,
     user_type: mu.user_type as 'brand' | 'influencer',
     display_name: mu.display_name ?? '',
     city: mu.city,
     niche: mu.niche,
-    is_verified: isVerified,
+    is_verified: false,
     is_boosted: false,
     created_at: mu.created_at ?? '',
-    ...extraFields,
-  } as PublicProfile;
+    rating_avg: 0,
+    total_reviews: 0,
+    bio: null, avatar_url: null, followers_ig: 0, engagement_rate_ig: null,
+    price_min: null, price_max: null, instagram_handle: null, tiktok_handle: null,
+    niches: [], creator_type: null, portfolio_urls: [],
+    logo_url: null, cover_photo_url: null, description: null, website: null, collab_brief: null,
+  };
+
+  if (mu.user_type === 'brand') {
+    const { data: bp } = await supabase
+      .from('brand_profiles')
+      .select('is_verified, is_boosted, logo_url, cover_photo_url, description, website, collab_brief, rating_avg, total_reviews')
+      .eq('user_id', userId)
+      .maybeSingle();
+    return {
+      ...base,
+      is_verified: bp?.is_verified ?? false,
+      is_boosted: bp?.is_boosted ?? false,
+      logo_url: bp?.logo_url ?? null,
+      cover_photo_url: bp?.cover_photo_url ?? null,
+      description: bp?.description ?? null,
+      website: bp?.website ?? null,
+      collab_brief: bp?.collab_brief ?? null,
+      rating_avg: bp?.rating_avg ?? 0,
+      total_reviews: bp?.total_reviews ?? 0,
+    };
+  }
+
+  if (mu.user_type === 'influencer') {
+    const { data: ip } = await supabase
+      .from('influencer_profiles')
+      .select('is_verified, is_boosted, bio, avatar_url, followers_ig, engagement_rate_ig, price_min, price_max, instagram_handle, tiktok_handle, niches, creator_type, rating_avg, total_reviews, portfolio_urls')
+      .eq('user_id', userId)
+      .maybeSingle();
+    return {
+      ...base,
+      is_verified: ip?.is_verified ?? false,
+      is_boosted: ip?.is_boosted ?? false,
+      bio: ip?.bio ?? null,
+      avatar_url: ip?.avatar_url ?? null,
+      followers_ig: ip?.followers_ig ?? 0,
+      engagement_rate_ig: ip?.engagement_rate_ig ?? null,
+      price_min: ip?.price_min ?? null,
+      price_max: ip?.price_max ?? null,
+      instagram_handle: ip?.instagram_handle ?? null,
+      tiktok_handle: ip?.tiktok_handle ?? null,
+      niches: ip?.niches ?? [],
+      creator_type: ip?.creator_type ?? null,
+      rating_avg: ip?.rating_avg ?? 0,
+      total_reviews: ip?.total_reviews ?? 0,
+      portfolio_urls: ip?.portfolio_urls ?? [],
+    };
+  }
+
+  return base;
 }
 
 // ─── Brand / Influencer Profiles ────────────────────────────────────────────
@@ -367,41 +388,44 @@ export interface PublicInfluencerProfile {
   display_name: string;
   instagram_handle: string | null;
   niches: string[];
+  niche: string | null;
   city: string | null;
   followers_ig: number;
   engagement_rate_ig: number | null;
   price_min: number | null;
   price_max: number | null;
   is_verified: boolean;
+  is_boosted: boolean;
   rating_avg: number;
   total_reviews: number;
   creator_type: 'influencer' | 'ugc' | 'both';
   avatar_url: string | null;
   bio: string | null;
+  portfolio_urls: string[];
 }
 
 export async function getPublicInfluencers(): Promise<PublicInfluencerProfile[]> {
   const { data } = await supabase
     .from('influencer_profiles')
-    .select('id, user_id, display_name, instagram_handle, niches, city, followers_ig, followers_tt, engagement_rate_ig, price_min, price_max, is_verified, rating_avg, total_reviews, creator_type, avatar_url, bio')
+    .select('id, user_id, display_name, instagram_handle, niches, city, followers_ig, followers_tt, engagement_rate_ig, price_min, price_max, is_verified, is_boosted, rating_avg, total_reviews, creator_type, avatar_url, bio, portfolio_urls')
     .in('creator_type', ['influencer', 'both'])
     .not('instagram_handle', 'is', null)
     .gt('followers_ig', 0)
     .order('is_verified', { ascending: false })
     .order('rating_avg', { ascending: false })
     .order('total_reviews', { ascending: false });
-  return (data ?? []) as unknown as PublicInfluencerProfile[];
+  return (data ?? []).map(d => ({ ...d, niche: d.niches?.[0] ?? null, portfolio_urls: d.portfolio_urls ?? [] })) as unknown as PublicInfluencerProfile[];
 }
 
 export async function getPublicUgcCreators(): Promise<PublicInfluencerProfile[]> {
   const { data } = await supabase
     .from('influencer_profiles')
-    .select('id, user_id, display_name, instagram_handle, niches, city, followers_ig, engagement_rate_ig, price_min, price_max, is_verified, rating_avg, total_reviews, creator_type, avatar_url, bio')
+    .select('id, user_id, display_name, instagram_handle, niches, city, followers_ig, engagement_rate_ig, price_min, price_max, is_verified, is_boosted, rating_avg, total_reviews, creator_type, avatar_url, bio, portfolio_urls')
     .in('creator_type', ['ugc', 'both'])
     .order('is_verified', { ascending: false })
     .order('rating_avg', { ascending: false })
     .order('total_reviews', { ascending: false });
-  return (data ?? []) as unknown as PublicInfluencerProfile[];
+  return (data ?? []).map(d => ({ ...d, niche: d.niches?.[0] ?? null, portfolio_urls: d.portfolio_urls ?? [] })) as unknown as PublicInfluencerProfile[];
 }
 
 /** Tipo para mostrar collabs en /discover con datos de la marca. */
