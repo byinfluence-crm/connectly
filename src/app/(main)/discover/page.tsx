@@ -9,8 +9,8 @@ import { useAuth } from '@/components/AuthProvider';
 import {
   applyToCollaboration, checkPlanLimit,
   getPublicCollaborations, getPublicInfluencers, getPublicUgcCreators,
-  getOrCreateDirectConversation,
-  type PublicCollaboration, type PublicInfluencerProfile,
+  getOrCreateDirectConversation, getUserPlan,
+  type PublicCollaboration, type PublicInfluencerProfile, type PlanTier,
 } from '@/lib/supabase';
 import { authFetch } from '@/lib/auth-fetch';
 import PlanLimitModal from '@/components/PlanLimitModal';
@@ -755,12 +755,26 @@ export default function DiscoverPage() {
   const userType = (user?.user_metadata?.user_type as string | undefined) ?? null;
   const { credits, loading: unlocking, unlock, persistedUnlocked } = useCredits(user?.id ?? null);
 
+  // Advanced filter state
+  const [planTier, setPlanTier] = useState<PlanTier>('free');
+  const [minFollowers, setMinFollowers] = useState<number | null>(null);
+  const [minER, setMinER] = useState<number | null>(null);
+  const [maxPrice, setMaxPrice] = useState<number | null>(null);
+  const [collabTypeFilter, setCollabTypeFilter] = useState<'all' | 'canje' | 'pago' | 'mixto'>('all');
+  const [maxBudget, setMaxBudget] = useState<number | null>(null);
+  const hasAdvancedSearch = planTier !== 'free';
+
   // Datos reales desde Supabase
   const [influencers, setInfluencers] = useState<PublicInfluencerProfile[]>([]);
   const [ugcCreators, setUgcCreators] = useState<PublicInfluencerProfile[]>([]);
   const [loadingCreators, setLoadingCreators] = useState(true);
   const [collabs, setCollabs] = useState<PublicCollaboration[]>([]);
   const [loadingCollabs, setLoadingCollabs] = useState(true);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    getUserPlan(user.id).then(p => setPlanTier(p.plan)).catch(() => {});
+  }, [user?.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -816,7 +830,10 @@ export default function DiscoverPage() {
     const matchQ = !query
       || p.display_name.toLowerCase().includes(query.toLowerCase())
       || (p.instagram_handle?.includes(query.toLowerCase()) ?? false);
-    return matchNiche && matchCity && matchQ;
+    const matchFollowers = !minFollowers || p.followers_ig >= minFollowers;
+    const matchER = !minER || (p.engagement_rate_ig ?? 0) >= minER;
+    const matchPrice = !maxPrice || ((p.price_min ?? 0) <= maxPrice);
+    return matchNiche && matchCity && matchQ && matchFollowers && matchER && matchPrice;
   };
 
   const filteredInfluencers = influencers.filter(filterProfile);
@@ -828,7 +845,9 @@ export default function DiscoverPage() {
     const matchQ = !query
       || c.title.toLowerCase().includes(query.toLowerCase())
       || (c.brand?.brand_name?.toLowerCase().includes(query.toLowerCase()) ?? false);
-    return matchNiche && matchCity && matchQ;
+    const matchType = collabTypeFilter === 'all' || c.collab_type === collabTypeFilter;
+    const matchBudget = !maxBudget || !c.budget_max || c.budget_max <= maxBudget;
+    return matchNiche && matchCity && matchQ && matchType && matchBudget;
   });
 
   const showInfluencers = creatorFilter === 'all' || creatorFilter === 'influencer';
@@ -925,22 +944,129 @@ export default function DiscoverPage() {
             )}
 
             {showFilters ? (
-              <div className="flex flex-wrap gap-4 py-2">
-                <div>
-                  <div className="text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wide">Nicho</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {NICHES.map(n => (
-                      <button key={n} onClick={() => setNiche(n)} className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${niche === n ? 'bg-violet-600 text-white border-violet-600' : 'border-gray-200 text-gray-600 bg-white hover:border-violet-300'}`}>{n}</button>
-                    ))}
+              <div className="space-y-4 py-2">
+                {/* Filtros básicos */}
+                <div className="flex flex-wrap gap-4">
+                  <div>
+                    <div className="text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wide">Nicho</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {NICHES.map(n => (
+                        <button key={n} onClick={() => setNiche(n)} className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${niche === n ? 'bg-violet-600 text-white border-violet-600' : 'border-gray-200 text-gray-600 bg-white hover:border-violet-300'}`}>{n}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wide">Ciudad</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {CITIES.map(c => (
+                        <button key={c} onClick={() => setCity(c)} className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${city === c ? 'bg-violet-600 text-white border-violet-600' : 'border-gray-200 text-gray-600 bg-white hover:border-violet-300'}`}>{c}</button>
+                      ))}
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <div className="text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wide">Ciudad</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {CITIES.map(c => (
-                      <button key={c} onClick={() => setCity(c)} className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${city === c ? 'bg-violet-600 text-white border-violet-600' : 'border-gray-200 text-gray-600 bg-white hover:border-violet-300'}`}>{c}</button>
-                    ))}
+
+                {/* Filtros avanzados */}
+                <div className="relative">
+                  <div className={`space-y-3 ${!hasAdvancedSearch ? 'select-none' : ''}`}>
+                    <div className="flex items-center gap-2">
+                      <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Filtros avanzados</div>
+                      {!hasAdvancedSearch && (
+                        <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 bg-violet-100 text-violet-700 rounded-full">
+                          <Lock size={9} /> Starter+
+                        </span>
+                      )}
+                    </div>
+
+                    {tab === 'influencers' ? (
+                      <div className={`flex flex-wrap gap-4 ${!hasAdvancedSearch ? 'opacity-40 pointer-events-none' : ''}`}>
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1.5 font-medium">Seguidores mínimos</div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {[null, 1000, 5000, 10000, 50000, 100000].map(v => (
+                              <button
+                                key={v ?? 'all'}
+                                onClick={() => setMinFollowers(v)}
+                                className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${minFollowers === v ? 'bg-violet-600 text-white border-violet-600' : 'border-gray-200 text-gray-600 bg-white hover:border-violet-300'}`}
+                              >
+                                {v === null ? 'Todos' : v >= 1000 ? `+${v / 1000}K` : `+${v}`}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1.5 font-medium">Engagement mínimo</div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {[null, 1, 2, 3, 5].map(v => (
+                              <button
+                                key={v ?? 'all'}
+                                onClick={() => setMinER(v)}
+                                className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${minER === v ? 'bg-violet-600 text-white border-violet-600' : 'border-gray-200 text-gray-600 bg-white hover:border-violet-300'}`}
+                              >
+                                {v === null ? 'Todos' : `+${v}%`}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1.5 font-medium">Precio máx. por post</div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {[null, 50, 100, 250, 500].map(v => (
+                              <button
+                                key={v ?? 'all'}
+                                onClick={() => setMaxPrice(v)}
+                                className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${maxPrice === v ? 'bg-violet-600 text-white border-violet-600' : 'border-gray-200 text-gray-600 bg-white hover:border-violet-300'}`}
+                              >
+                                {v === null ? 'Todos' : `≤${v}€`}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className={`flex flex-wrap gap-4 ${!hasAdvancedSearch ? 'opacity-40 pointer-events-none' : ''}`}>
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1.5 font-medium">Tipo de compensación</div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {(['all', 'canje', 'pago', 'mixto'] as const).map(v => (
+                              <button
+                                key={v}
+                                onClick={() => setCollabTypeFilter(v)}
+                                className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${collabTypeFilter === v ? 'bg-violet-600 text-white border-violet-600' : 'border-gray-200 text-gray-600 bg-white hover:border-violet-300'}`}
+                              >
+                                {v === 'all' ? 'Todos' : v === 'canje' ? 'Canje' : v === 'pago' ? 'Pago' : 'Canje + Pago'}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1.5 font-medium">Presupuesto máximo</div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {[null, 50, 100, 250, 500].map(v => (
+                              <button
+                                key={v ?? 'all'}
+                                onClick={() => setMaxBudget(v)}
+                                className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${maxBudget === v ? 'bg-violet-600 text-white border-violet-600' : 'border-gray-200 text-gray-600 bg-white hover:border-violet-300'}`}
+                              >
+                                {v === null ? 'Todos' : `≤${v}€`}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
+
+                  {!hasAdvancedSearch && (
+                    <button
+                      onClick={() => router.push('/pricing')}
+                      className="absolute inset-0 flex items-end justify-start pb-1"
+                      aria-label="Upgrade para filtros avanzados"
+                    >
+                      <span className="flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors">
+                        <Zap size={12} /> Desbloquear con plan Starter — desde 29€/mes
+                      </span>
+                    </button>
+                  )}
                 </div>
               </div>
             ) : (
