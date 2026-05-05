@@ -27,6 +27,12 @@ export function useChatDirect(conversationId: string, userId: string) {
     return () => { cancelled = true; };
   }, [conversationId]);
 
+  const refresh = useCallback(async () => {
+    if (!conversationId) return;
+    const msgs = await getDirectMessages(conversationId);
+    setMessages(msgs);
+  }, [conversationId]);
+
   // Suscripción Realtime
   useEffect(() => {
     if (!conversationId) return;
@@ -43,12 +49,16 @@ export function useChatDirect(conversationId: string, userId: string) {
         },
         payload => {
           const msg = payload.new as DirectMessage;
-          setMessages(prev =>
-            prev.some(m => m.id === msg.id) ? prev : [...prev, msg],
-          );
-          // Si el mensaje es del otro, marcarlo como leído inmediatamente
-          if (msg.sender_user_id !== userId) {
-            markDirectMessagesRead(conversationId, userId).catch(() => {});
+          if (msg.message_type === 'offer') {
+            // Re-fetch to get joined offer data from the DB
+            getDirectMessages(conversationId).then(setMessages).catch(console.error);
+          } else {
+            setMessages(prev =>
+              prev.some(m => m.id === msg.id) ? prev : [...prev, msg],
+            );
+            if (msg.sender_user_id !== userId) {
+              markDirectMessagesRead(conversationId, userId).catch(() => {});
+            }
           }
         },
       )
@@ -56,7 +66,7 @@ export function useChatDirect(conversationId: string, userId: string) {
 
     channelRef.current = channel;
     return () => { supabase.removeChannel(channel); };
-  }, [conversationId]);
+  }, [conversationId, userId]);
 
   const send = useCallback(async (content: string): Promise<{ blocked?: boolean }> => {
     if (!content.trim()) return {};
@@ -74,5 +84,5 @@ export function useChatDirect(conversationId: string, userId: string) {
     return {};
   }, [conversationId, userId]);
 
-  return { messages, loading, sending, send };
+  return { messages, loading, sending, send, refresh };
 }

@@ -1,11 +1,12 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Send, ShieldAlert, Lock, MoreVertical } from 'lucide-react';
+import { ArrowLeft, Send, ShieldAlert, Lock, Euro } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { useChatDirect } from '@/lib/hooks/useChatDirect';
 import { containsBlockedContent } from '@/lib/hooks/useChat';
-import { getDirectConversationById } from '@/lib/supabase';
+import { getDirectConversationById, sendDirectOffer, respondToDirectOffer } from '@/lib/supabase';
+import OfferBubble from '@/components/OfferBubble';
 
 type ConvInfo = Awaited<ReturnType<typeof getDirectConversationById>>;
 
@@ -34,10 +35,16 @@ export default function DirectChatPage() {
   const [phoneWarning, setPhoneWarning] = useState(false);
   const [blocked, setBlocked] = useState(false);
 
+  // Offer panel state
+  const [showOfferPanel, setShowOfferPanel] = useState(false);
+  const [offerAmount, setOfferAmount] = useState('');
+  const [offerDesc, setOfferDesc] = useState('');
+  const [sendingOffer, setSendingOffer] = useState(false);
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const { messages, loading: loadingMsgs, sending, send } = useChatDirect(
+  const { messages, loading: loadingMsgs, sending, send, refresh } = useChatDirect(
     conversationId,
     user?.id ?? '',
   );
@@ -51,7 +58,6 @@ export default function DirectChatPage() {
     getDirectConversationById(conversationId)
       .then(data => {
         if (!data) { router.replace('/dashboard'); return; }
-        // Verificar que el usuario es participante
         if (data.brand_user_id !== user?.id && data.creator_user_id !== user?.id) {
           router.replace('/dashboard');
           return;
@@ -104,8 +110,43 @@ export default function DirectChatPage() {
   const isBrand = user?.id === convInfo.brand_user_id;
   const otherName = isBrand ? convInfo.creator_name : convInfo.brand_name;
   const otherAvatar = isBrand ? convInfo.creator_avatar : convInfo.brand_avatar;
+  const receiverUserId = isBrand ? convInfo.creator_user_id : convInfo.brand_user_id;
   const userType = user?.user_metadata?.user_type as string | undefined;
   const backHref = userType === 'brand' ? '/dashboard/brand/messages' : '/dashboard/creator/messages';
+
+  const handleSendOffer = async () => {
+    const amount = parseFloat(offerAmount);
+    if (!amount || amount <= 0 || !user?.id || !receiverUserId) return;
+    setSendingOffer(true);
+    try {
+      await sendDirectOffer({
+        conversationId,
+        senderUserId: user.id,
+        receiverUserId,
+        amount,
+        description: offerDesc.trim() || undefined,
+      });
+      setShowOfferPanel(false);
+      setOfferAmount('');
+      setOfferDesc('');
+    } catch (err) {
+      console.error('sendDirectOffer error:', err);
+    } finally {
+      setSendingOffer(false);
+    }
+  };
+
+  const handleAcceptOffer = async (offerId: string) => {
+    if (!user?.id) return;
+    await respondToDirectOffer({ offerId, response: 'accepted', conversationId, senderUserId: user.id });
+    await refresh();
+  };
+
+  const handleRejectOffer = async (offerId: string) => {
+    if (!user?.id) return;
+    await respondToDirectOffer({ offerId, response: 'rejected', conversationId, senderUserId: user.id });
+    await refresh();
+  };
 
   // Agrupar mensajes por fecha
   const grouped: { date: string; msgs: typeof messages }[] = [];
@@ -129,8 +170,7 @@ export default function DirectChatPage() {
             <ArrowLeft size={20} />
           </button>
 
-          {/* Avatar */}
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center text-white text-sm font-bold flex-shrink-0 overflow-hidden flex-shrink-0">
+          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center text-white text-sm font-bold flex-shrink-0 overflow-hidden">
             {otherAvatar
               ? <img src={otherAvatar} alt="" className="w-full h-full object-cover" />
               : otherName.charAt(0).toUpperCase()
@@ -142,10 +182,8 @@ export default function DirectChatPage() {
             <div className="text-xs text-gray-400">Chat directo</div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 text-xs text-violet-600 font-medium bg-violet-50 px-2.5 py-1 rounded-full">
-              <Lock size={10} /> Seguro
-            </div>
+          <div className="flex items-center gap-1 text-xs text-violet-600 font-medium bg-violet-50 px-2.5 py-1 rounded-full">
+            <Lock size={10} /> Seguro
           </div>
         </div>
       </div>
@@ -164,7 +202,6 @@ export default function DirectChatPage() {
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-2xl mx-auto px-4 py-4 space-y-1">
 
-          {/* Cabecera de contexto */}
           <div className="flex justify-center mb-6">
             <div className="bg-white border border-gray-100 rounded-2xl px-4 py-3 shadow-sm text-center max-w-xs">
               <div className="text-2xl mb-1">💬</div>
@@ -206,13 +243,13 @@ export default function DirectChatPage() {
                   const isMine = msg.sender_user_id === user?.id;
                   const prevMsg = msgs[i - 1];
                   const sameSender = prevMsg?.sender_user_id === msg.sender_user_id;
+                  const isOffer = msg.message_type === 'offer' && msg.offer;
 
                   return (
                     <div
                       key={msg.id}
-                      className={`flex ${isMine ? 'justify-end' : 'justify-start'} ${sameSender ? 'mt-0.5' : 'mt-3'}`}
+                      className={`flex ${isMine ? 'justify-end' : 'justify-start'} ${sameSender && !isOffer ? 'mt-0.5' : 'mt-3'}`}
                     >
-                      {/* Avatar del otro (solo primer mensaje del grupo) */}
                       {!isMine && !sameSender && (
                         <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-400 to-violet-600 flex items-center justify-center text-white text-xs font-bold mr-2 flex-shrink-0 mt-auto overflow-hidden">
                           {otherAvatar
@@ -221,18 +258,27 @@ export default function DirectChatPage() {
                           }
                         </div>
                       )}
-                      {!isMine && sameSender && <div className="w-7 mr-2 flex-shrink-0" />}
+                      {!isMine && sameSender && !isOffer && <div className="w-7 mr-2 flex-shrink-0" />}
 
-                      <div className={`max-w-[72%] sm:max-w-[58%] flex flex-col ${isMine ? 'items-end' : 'items-start'}`}>
-                        <div
-                          className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
-                            isMine
-                              ? 'bg-violet-600 text-white rounded-br-sm'
-                              : 'bg-white text-gray-900 border border-gray-100 shadow-sm rounded-bl-sm'
-                          }`}
-                        >
-                          {msg.content}
-                        </div>
+                      <div className={`${isOffer ? 'max-w-[280px]' : 'max-w-[72%] sm:max-w-[58%]'} flex flex-col ${isMine ? 'items-end' : 'items-start'}`}>
+                        {isOffer && msg.offer ? (
+                          <OfferBubble
+                            offer={msg.offer}
+                            isMine={isMine}
+                            onAccept={handleAcceptOffer}
+                            onReject={handleRejectOffer}
+                          />
+                        ) : (
+                          <div
+                            className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                              isMine
+                                ? 'bg-violet-600 text-white rounded-br-sm'
+                                : 'bg-white text-gray-900 border border-gray-100 shadow-sm rounded-bl-sm'
+                            }`}
+                          >
+                            {msg.content}
+                          </div>
+                        )}
                         {(i === msgs.length - 1 || msgs[i + 1]?.sender_user_id !== msg.sender_user_id) && (
                           <span className="text-[10px] text-gray-400 mt-1 px-1">
                             {formatTime(msg.created_at)}
@@ -254,6 +300,53 @@ export default function DirectChatPage() {
       <div className="bg-white border-t border-gray-100 flex-shrink-0">
         <div className="max-w-2xl mx-auto px-4 py-3">
 
+          {/* Offer panel */}
+          {showOfferPanel && (
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 mb-3">
+              <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-1.5">
+                <Euro size={14} className="text-violet-600" /> Proponer oferta
+              </h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-gray-500 font-medium block mb-1">Importe (€)</label>
+                  <input
+                    type="number"
+                    value={offerAmount}
+                    onChange={e => setOfferAmount(e.target.value)}
+                    placeholder="0"
+                    min="1"
+                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 font-medium block mb-1">Descripción (opcional)</label>
+                  <textarea
+                    value={offerDesc}
+                    onChange={e => setOfferDesc(e.target.value)}
+                    placeholder="Ej. Incluye 2 posts + stories…"
+                    rows={2}
+                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm bg-white resize-none focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  />
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <button
+                    onClick={() => { setShowOfferPanel(false); setOfferAmount(''); setOfferDesc(''); }}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-500 hover:bg-gray-200 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleSendOffer}
+                    disabled={!offerAmount || parseFloat(offerAmount) <= 0 || sendingOffer}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition-colors"
+                  >
+                    {sendingOffer ? 'Enviando…' : 'Enviar oferta'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {(phoneWarning || blocked) && (
             <div className="flex items-start gap-2.5 bg-red-50 border border-red-200 rounded-2xl px-4 py-3 mb-3">
               <ShieldAlert size={16} className="text-red-600 flex-shrink-0 mt-0.5" />
@@ -267,6 +360,19 @@ export default function DirectChatPage() {
           )}
 
           <div className="flex items-end gap-2">
+            {/* Offer button */}
+            <button
+              onClick={() => setShowOfferPanel(v => !v)}
+              className={`flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center transition-all ${
+                showOfferPanel
+                  ? 'bg-violet-100 text-violet-700'
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
+              title="Proponer oferta"
+            >
+              <Euro size={16} />
+            </button>
+
             <textarea
               ref={inputRef}
               value={input}

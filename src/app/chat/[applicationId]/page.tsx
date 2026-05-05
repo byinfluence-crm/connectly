@@ -2,10 +2,11 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Send, ShieldAlert, Lock } from 'lucide-react';
+import { ArrowLeft, Send, ShieldAlert, Lock, Euro } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { useChat, containsBlockedContent } from '@/lib/hooks/useChat';
-import { getApplicationById } from '@/lib/supabase';
+import { getApplicationById, sendOffer, respondToOffer } from '@/lib/supabase';
+import OfferBubble from '@/components/OfferBubble';
 
 type AppInfo = Awaited<ReturnType<typeof getApplicationById>>;
 
@@ -35,10 +36,16 @@ export default function ChatPage() {
   const [phoneWarning, setPhoneWarning] = useState(false);
   const [blocked, setBlocked] = useState(false);
 
+  // Offer panel state
+  const [showOfferPanel, setShowOfferPanel] = useState(false);
+  const [offerAmount, setOfferAmount] = useState('');
+  const [offerDesc, setOfferDesc] = useState('');
+  const [sendingOffer, setSendingOffer] = useState(false);
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const { messages, loading: loadingMsgs, sending, send } = useChat(
+  const { messages, loading: loadingMsgs, sending, send, refresh } = useChat(
     applicationId,
     user?.id ?? '',
   );
@@ -49,24 +56,20 @@ export default function ChatPage() {
     getApplicationById(applicationId)
       .then(data => {
         setAppInfo(data);
-        // Si la aplicación no está aceptada, redirigir
         if (data && data.status !== 'accepted') router.replace('/dashboard');
       })
       .catch(() => router.replace('/dashboard'))
       .finally(() => setLoadingInfo(false));
   }, [applicationId, router]);
 
-  // Redirigir si no autenticado
   useEffect(() => {
     if (!authLoading && !user) router.replace('/login');
   }, [user, authLoading, router]);
 
-  // Scroll al último mensaje
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Detectar contenido bloqueado en tiempo real mientras escribe
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     setInput(val);
@@ -106,12 +109,48 @@ export default function ChatPage() {
 
   if (!appInfo) return null;
 
-  // El usuario es creador si su auth.uid coincide con el user_id del influencer_profile
   const isCreator = user?.id === appInfo.creator?.user_id;
   const otherName = isCreator
     ? appInfo.brand?.display_name ?? 'Marca'
     : appInfo.creator?.display_name ?? 'Creador';
   const collabTitle = appInfo.collab?.title ?? '';
+  const receiverUserId = isCreator
+    ? appInfo.brand_id
+    : (appInfo.creator?.user_id ?? '');
+
+  const handleSendOffer = async () => {
+    const amount = parseFloat(offerAmount);
+    if (!amount || amount <= 0 || !user?.id || !receiverUserId) return;
+    setSendingOffer(true);
+    try {
+      await sendOffer({
+        applicationId,
+        senderUserId: user.id,
+        receiverUserId,
+        amount,
+        description: offerDesc.trim() || undefined,
+      });
+      setShowOfferPanel(false);
+      setOfferAmount('');
+      setOfferDesc('');
+    } catch (err) {
+      console.error('sendOffer error:', err);
+    } finally {
+      setSendingOffer(false);
+    }
+  };
+
+  const handleAcceptOffer = async (offerId: string) => {
+    if (!user?.id) return;
+    await respondToOffer({ offerId, response: 'accepted', applicationId, senderUserId: user.id });
+    await refresh();
+  };
+
+  const handleRejectOffer = async (offerId: string) => {
+    if (!user?.id) return;
+    await respondToOffer({ offerId, response: 'rejected', applicationId, senderUserId: user.id });
+    await refresh();
+  };
 
   // Agrupar mensajes por fecha
   const grouped: { date: string; msgs: typeof messages }[] = [];
@@ -137,7 +176,6 @@ export default function ChatPage() {
             <ArrowLeft size={20} />
           </Link>
 
-          {/* Avatar inicial */}
           <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
             {otherName.charAt(0).toUpperCase()}
           </div>
@@ -149,14 +187,13 @@ export default function ChatPage() {
             )}
           </div>
 
-          {/* Badge "Seguro" */}
           <div className="flex items-center gap-1 text-xs text-violet-600 font-medium bg-violet-50 px-2.5 py-1 rounded-full flex-shrink-0">
             <Lock size={10} /> Seguro
           </div>
         </div>
       </div>
 
-      {/* ── Aviso de política (siempre visible) ── */}
+      {/* ── Aviso de política ── */}
       <div className="bg-amber-50 border-b border-amber-100 flex-shrink-0">
         <div className="max-w-2xl mx-auto px-4 py-2 flex items-start gap-2 text-xs text-amber-700">
           <ShieldAlert size={13} className="flex-shrink-0 mt-0.5" />
@@ -187,7 +224,6 @@ export default function ChatPage() {
           ) : (
             grouped.map(({ date, msgs }) => (
               <div key={date}>
-                {/* Separador de fecha */}
                 <div className="flex items-center gap-3 my-4">
                   <div className="flex-1 h-px bg-gray-200" />
                   <span className="text-xs text-gray-400 font-medium px-2">{date}</span>
@@ -198,23 +234,32 @@ export default function ChatPage() {
                   const isMine = msg.sender_user_id === user?.id;
                   const prevMsg = msgs[i - 1];
                   const sameSender = prevMsg?.sender_user_id === msg.sender_user_id;
+                  const isOffer = msg.message_type === 'offer' && msg.offer;
 
                   return (
                     <div
                       key={msg.id}
-                      className={`flex ${isMine ? 'justify-end' : 'justify-start'} ${sameSender ? 'mt-0.5' : 'mt-3'}`}
+                      className={`flex ${isMine ? 'justify-end' : 'justify-start'} ${sameSender && !isOffer ? 'mt-0.5' : 'mt-3'}`}
                     >
-                      <div className={`max-w-[75%] sm:max-w-[60%] ${isMine ? 'items-end' : 'items-start'} flex flex-col`}>
-                        <div
-                          className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
-                            isMine
-                              ? 'bg-violet-600 text-white rounded-br-sm'
-                              : 'bg-white text-gray-900 border border-gray-100 shadow-sm rounded-bl-sm'
-                          }`}
-                        >
-                          {msg.content}
-                        </div>
-                        {/* Hora — solo en el último mensaje del grupo */}
+                      <div className={`${isOffer ? 'max-w-[280px]' : 'max-w-[75%] sm:max-w-[60%]'} ${isMine ? 'items-end' : 'items-start'} flex flex-col`}>
+                        {isOffer && msg.offer ? (
+                          <OfferBubble
+                            offer={msg.offer}
+                            isMine={isMine}
+                            onAccept={handleAcceptOffer}
+                            onReject={handleRejectOffer}
+                          />
+                        ) : (
+                          <div
+                            className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                              isMine
+                                ? 'bg-violet-600 text-white rounded-br-sm'
+                                : 'bg-white text-gray-900 border border-gray-100 shadow-sm rounded-bl-sm'
+                            }`}
+                          >
+                            {msg.content}
+                          </div>
+                        )}
                         {(i === msgs.length - 1 || msgs[i + 1]?.sender_user_id !== msg.sender_user_id) && (
                           <span className="text-[10px] text-gray-400 mt-1 px-1">
                             {formatTime(msg.created_at)}
@@ -236,7 +281,54 @@ export default function ChatPage() {
       <div className="bg-white border-t border-gray-100 flex-shrink-0">
         <div className="max-w-2xl mx-auto px-4 py-3">
 
-          {/* ── Banner de bloqueo ── */}
+          {/* Offer panel */}
+          {showOfferPanel && (
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 mb-3">
+              <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-1.5">
+                <Euro size={14} className="text-violet-600" /> Proponer oferta
+              </h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-gray-500 font-medium block mb-1">Importe (€)</label>
+                  <input
+                    type="number"
+                    value={offerAmount}
+                    onChange={e => setOfferAmount(e.target.value)}
+                    placeholder="0"
+                    min="1"
+                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 font-medium block mb-1">Descripción (opcional)</label>
+                  <textarea
+                    value={offerDesc}
+                    onChange={e => setOfferDesc(e.target.value)}
+                    placeholder="Ej. Incluye 2 posts + stories…"
+                    rows={2}
+                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm bg-white resize-none focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  />
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <button
+                    onClick={() => { setShowOfferPanel(false); setOfferAmount(''); setOfferDesc(''); }}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-500 hover:bg-gray-200 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleSendOffer}
+                    disabled={!offerAmount || parseFloat(offerAmount) <= 0 || sendingOffer}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition-colors"
+                  >
+                    {sendingOffer ? 'Enviando…' : 'Enviar oferta'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Blocked warning */}
           {(phoneWarning || blocked) && (
             <div className="flex items-start gap-2.5 bg-red-50 border border-red-200 rounded-2xl px-4 py-3 mb-3">
               <ShieldAlert size={16} className="text-red-600 flex-shrink-0 mt-0.5" />
@@ -250,6 +342,19 @@ export default function ChatPage() {
           )}
 
           <div className="flex items-end gap-2">
+            {/* Offer button */}
+            <button
+              onClick={() => setShowOfferPanel(v => !v)}
+              className={`flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center transition-all ${
+                showOfferPanel
+                  ? 'bg-violet-100 text-violet-700'
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
+              title="Proponer oferta"
+            >
+              <Euro size={16} />
+            </button>
+
             <textarea
               ref={inputRef}
               value={input}

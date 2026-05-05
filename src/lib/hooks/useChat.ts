@@ -131,6 +131,12 @@ export function useChat(applicationId: string, userId: string) {
     return () => { cancelled = true; };
   }, [applicationId]);
 
+  const refresh = useCallback(async () => {
+    if (!applicationId) return;
+    const msgs = await getMessages(applicationId);
+    setMessages(msgs);
+  }, [applicationId]);
+
   // Suscripción Realtime — solo cuando tenemos conversationId
   useEffect(() => {
     if (!conversationId) return;
@@ -147,16 +153,21 @@ export function useChat(applicationId: string, userId: string) {
         },
         payload => {
           const msg = payload.new as Message;
-          setMessages(prev =>
-            prev.some(m => m.id === msg.id) ? prev : [...prev, msg],
-          );
+          if (msg.message_type === 'offer') {
+            // Re-fetch to get joined offer data from the DB
+            getMessages(applicationId).then(setMessages).catch(console.error);
+          } else {
+            setMessages(prev =>
+              prev.some(m => m.id === msg.id) ? prev : [...prev, msg],
+            );
+          }
         },
       )
       .subscribe();
 
     channelRef.current = channel;
     return () => { supabase.removeChannel(channel); };
-  }, [conversationId]);
+  }, [conversationId, applicationId]);
 
   const send = useCallback(async (content: string): Promise<{ blocked?: boolean }> => {
     if (!content.trim()) return {};
@@ -174,5 +185,5 @@ export function useChat(applicationId: string, userId: string) {
     return {};
   }, [applicationId, userId]);
 
-  return { messages, loading, sending, send };
+  return { messages, loading, sending, send, refresh };
 }
