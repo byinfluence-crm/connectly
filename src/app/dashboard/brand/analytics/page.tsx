@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  TrendingUp, Users, Star, BarChart3, ChevronRight,
+  TrendingUp, Users, Star, BarChart3, ChevronRight, AlertCircle,
 } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis,
@@ -159,44 +159,57 @@ export default function BrandAnalyticsPage() {
     );
   }
 
+  const isMock = completed.length === 0;
+
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-8">
 
         <div>
           <h1 className="text-xl font-bold text-gray-900">Rendimiento de tus campañas</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {completed.length > 0
-              ? `${completed.length} colaboraciones completadas`
-              : 'Datos de ejemplo — se actualizarán con tus primeras campañas'}
+            {isMock ? 'Completa tu primera colaboración para ver tus datos reales' : `${completed.length} colaboraciones completadas`}
           </p>
         </div>
+
+        {/* Banner datos de ejemplo */}
+        {isMock && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3.5 flex items-start gap-3">
+            <AlertCircle size={18} className="text-amber-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-amber-800">Estás viendo datos de ejemplo</p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                Cuando completes tu primera colaboración con un creador, este panel mostrará tus estadísticas reales de alcance, engagement y rendimiento.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <StatCard
             icon={<BarChart3 size={16} className="text-violet-600" />}
             label="Campañas completadas"
-            value={completed.length > 0 ? String(completed.length) : '18'}
+            value={isMock ? '—' : String(completed.length)}
             color="violet"
           />
           <StatCard
             icon={<Users size={16} className="text-blue-600" />}
             label="Alcance total"
-            value={totalReach > 0 ? fmt(totalReach) : '148.4K'}
+            value={isMock ? '—' : fmt(totalReach)}
             color="blue"
           />
           <StatCard
             icon={<TrendingUp size={16} className="text-emerald-600" />}
             label="Engagement rate"
-            value={avgER ?? '8.7%'}
+            value={isMock ? '—' : (avgER ? `${avgER}%` : '—')}
             sub="Media ponderada"
             color="emerald"
           />
           <StatCard
             icon={<Star size={16} className="text-amber-600" />}
             label="Rating medio creadores"
-            value={avgCreatorRating ? `${avgCreatorRating} ★` : '—'}
-            sub={completed.length > 0 ? `${completed.length} colaboraciones` : 'Sin datos aún'}
+            value={isMock ? '—' : (avgCreatorRating ? `${avgCreatorRating} ★` : '—')}
+            sub={completed.length > 0 ? `${completed.length} colaboraciones` : undefined}
             color="amber"
           />
         </div>

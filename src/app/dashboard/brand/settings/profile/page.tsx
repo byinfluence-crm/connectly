@@ -239,7 +239,7 @@ export default function BrandProfilePage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Tipo de cocina / concepto</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Concepto / especialidad</label>
                 <input
                   value={form.cuisine_type}
                   onChange={e => setForm(f => ({ ...f, cuisine_type: e.target.value }))}

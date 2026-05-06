@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Plus, Users, Clock, CheckCircle,
-  XCircle, ChevronRight, MapPin, Flame, Eye,
-  MoreHorizontal, Star, MessageCircle, Zap,
+  XCircle, ChevronRight, MapPin, Flame,
+  Star, MessageCircle, Zap,
 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
@@ -14,56 +14,11 @@ import {
   getApplicationsByBrand, updateApplicationStatus, getDelivery,
   getBrandProfileByUserId, getCollaborationsByBrand,
 } from '@/lib/supabase';
-import type { ApplicationWithCreator, CollabDelivery, BrandProfile } from '@/lib/supabase';
+import type { ApplicationWithCreator, CollabDelivery, BrandProfile, Collaboration } from '@/lib/supabase';
 import { OnboardingChecklist } from '@/components/OnboardingChecklist';
 import type { OnboardingStep } from '@/components/OnboardingChecklist';
 import BrandReviewModal from '@/components/BrandReviewModal';
 
-/* ─── MOCK DATA ─────────────────────────────────────────────────── */
-const MOCK_COLLABS = [
-  {
-    id: 1, title: 'Foodie para reels de nueva carta de primavera', niche: 'Gastronomía',
-    status: 'active' as const, applicants: 7, views: 134, deadline: '30 abr',
-    budget: null, type: 'Canje', created: '12 abr',
-  },
-  {
-    id: 2, title: 'Campaña de redes para apertura de segunda tienda', niche: 'Moda',
-    status: 'draft' as const, applicants: 0, views: 0, deadline: '20 may',
-    budget: 400, type: 'Pago', created: '15 abr',
-  },
-  {
-    id: 3, title: 'Embajador para línea de productos ecológicos', niche: 'Bienestar',
-    status: 'closed' as const, applicants: 19, views: 312, deadline: '1 abr',
-    budget: 200, type: 'Ambos', created: '10 mar',
-  },
-];
-
-const MOCK_CANDIDATES = [
-  {
-    id: 1, name: 'Laura Sánchez', handle: '@laurastyle', niche: 'Moda', city: 'Madrid',
-    followers: 48200, er: 4.2, rating: 4.9, collab: 'Campaña apertura tienda',
-    status: 'pending' as const, appliedAt: 'hace 2h',
-    img: 'https://picsum.photos/seed/laura-s/80/80',
-  },
-  {
-    id: 2, name: 'Ana Martín', handle: '@anafit', niche: 'Fitness', city: 'Barcelona',
-    followers: 91000, er: 3.8, rating: 4.7, collab: 'Foodie reels carta primavera',
-    status: 'pending' as const, appliedAt: 'hace 5h',
-    img: 'https://picsum.photos/seed/ana-m/80/80',
-  },
-  {
-    id: 3, name: 'Marta Vega', handle: '@martawellness', niche: 'Bienestar', city: 'Málaga',
-    followers: 18300, er: 7.4, rating: 4.9, collab: 'Foodie reels carta primavera',
-    status: 'accepted' as const, appliedAt: 'hace 1d',
-    img: 'https://picsum.photos/seed/marta-v/80/80',
-  },
-  {
-    id: 4, name: 'Elena Castro', handle: '@elenabeauty', niche: 'Belleza', city: 'Madrid',
-    followers: 29800, er: 5.8, rating: 4.8, collab: 'Foodie reels carta primavera',
-    status: 'rejected' as const, appliedAt: 'hace 2d',
-    img: 'https://picsum.photos/seed/elena-c/80/80',
-  },
-];
 
 const STATUS_LABELS = {
   active: { label: 'Activa', variant: 'success' as const },
@@ -89,19 +44,18 @@ export default function BrandDashboard() {
   } | null>(null);
 
   const displayName = (user?.user_metadata?.display_name as string) ?? 'Mi Marca';
-  const credits = 20; // mock — useCredits cuando haya plan Stripe
 
   const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
-  const [hasCollabs, setHasCollabs] = useState(false);
+  const [collabs, setCollabs] = useState<Collaboration[]>([]);
   const [onboardingSteps, setOnboardingSteps] = useState<OnboardingStep[]>([]);
 
   useEffect(() => {
     if (!user?.id) return;
     Promise.all([getBrandProfileByUserId(user.id), getCollaborationsByBrand(user.id)])
-      .then(([profile, collabs]) => {
+      .then(([profile, fetchedCollabs]) => {
         setBrandProfile(profile);
-        const hasAny = collabs.length > 0;
-        setHasCollabs(hasAny);
+        setCollabs(fetchedCollabs);
+        const hasAny = fetchedCollabs.length > 0;
         setOnboardingSteps([
           {
             id: 'account',
@@ -172,10 +126,7 @@ export default function BrandDashboard() {
     }
   };
 
-  // Usar datos reales si hay, si no mock para demo visual
-  const showMockCandidates = !loadingApps && applications.length === 0;
-  const pending = applications.filter(a => a.status === 'pending').length +
-    (showMockCandidates ? MOCK_CANDIDATES.filter(c => c.status === 'pending').length : 0);
+  const pending = applications.filter(a => a.status === 'pending').length;
   const pendingReviews = applications.filter(
     a => a.status === 'accepted' && a.collab_status === 'pending_brand_review'
   );
@@ -248,7 +199,7 @@ export default function BrandDashboard() {
             <StatCard
               icon={<Flame size={18} className="text-violet-600" />}
               label="Colaboraciones activas"
-              value={MOCK_COLLABS.filter(c => c.status === 'active').length}
+              value={collabs.filter(c => c.status === 'active').length}
               bg="bg-violet-50"
             />
             <StatCard
@@ -260,14 +211,14 @@ export default function BrandDashboard() {
             />
             <StatCard
               icon={<Zap size={18} className="text-violet-600" />}
-              label="Créditos disponibles"
-              value={credits}
+              label="Total colaboraciones"
+              value={collabs.length}
               bg="bg-violet-50"
             />
             <StatCard
-              icon={<Eye size={18} className="text-emerald-600" />}
-              label="Vistas totales"
-              value={MOCK_COLLABS.reduce((s, c) => s + c.views, 0)}
+              icon={<Users size={18} className="text-emerald-600" />}
+              label="Candidatos totales"
+              value={applications.length}
               bg="bg-emerald-50"
             />
           </div>
@@ -276,40 +227,58 @@ export default function BrandDashboard() {
           <section>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-bold text-gray-900">Mis colaboraciones</h2>
-              <Link href="/discover" className="text-xs text-violet-600 font-semibold flex items-center gap-1 hover:text-violet-700">
-                Descubrir creadores <ChevronRight size={13} />
+              <Link href="/dashboard/brand/collabs" className="text-xs text-violet-600 font-semibold flex items-center gap-1 hover:text-violet-700">
+                Ver todas <ChevronRight size={13} />
               </Link>
             </div>
 
-            <div className="space-y-3">
-              {MOCK_COLLABS.map(collab => (
-                <div
-                  key={collab.id}
-                  className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-4"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <span className="text-sm font-semibold text-gray-900 truncate">{collab.title}</span>
-                      <Badge variant={STATUS_LABELS[collab.status].variant} size="sm">
-                        {STATUS_LABELS[collab.status].label}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-gray-400">
-                      <span className="flex items-center gap-1"><Users size={11} />{collab.applicants} solicitudes</span>
-                      <span className="flex items-center gap-1"><Eye size={11} />{collab.views} vistas</span>
-                      <span>Hasta {collab.deadline}</span>
-                    </div>
-                  </div>
-                  <button className="flex-shrink-0 p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors">
-                    <MoreHorizontal size={16} />
-                  </button>
+            {collabs.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-8 text-center">
+                <div className="text-2xl mb-2">📢</div>
+                <div className="text-sm font-semibold text-gray-700 mb-1">Aún no has publicado ninguna colaboración</div>
+                <div className="text-xs text-gray-400 mb-4">
+                  Crea tu primera campaña y empieza a recibir solicitudes de creadores
                 </div>
-              ))}
-
-              <button className="w-full border-2 border-dashed border-gray-200 rounded-2xl py-4 text-sm text-gray-400 hover:border-violet-300 hover:text-violet-600 transition-colors flex items-center justify-center gap-2 font-medium">
-                <Plus size={16} /> Nueva colaboración
-              </button>
-            </div>
+                <Button size="sm" onClick={() => router.push('/dashboard/brand/collabs/new')}>
+                  <Plus size={14} /> Nueva colaboración
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {collabs.slice(0, 4).map(collab => {
+                  const fmtDeadline = collab.deadline
+                    ? new Date(collab.deadline).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
+                    : null;
+                  const typeLabel = collab.collab_type === 'canje' ? 'Canje' : collab.collab_type === 'pago' ? 'Pago' : 'Canje + Pago';
+                  return (
+                    <Link key={collab.id} href={`/dashboard/brand/collabs`}>
+                      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-4 hover:border-violet-200 transition-all cursor-pointer">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className="text-sm font-semibold text-gray-900 truncate">{collab.title}</span>
+                            <Badge variant={STATUS_LABELS[collab.status as keyof typeof STATUS_LABELS]?.variant ?? 'default'} size="sm">
+                              {STATUS_LABELS[collab.status as keyof typeof STATUS_LABELS]?.label ?? collab.status}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-gray-400">
+                            <span>{typeLabel}</span>
+                            {collab.budget_min && <span>· {collab.budget_min}€</span>}
+                            {fmtDeadline && <span>· Hasta {fmtDeadline}</span>}
+                          </div>
+                        </div>
+                        <ChevronRight size={15} className="text-gray-300 flex-shrink-0" />
+                      </div>
+                    </Link>
+                  );
+                })}
+                <button
+                  onClick={() => router.push('/dashboard/brand/collabs/new')}
+                  className="w-full border-2 border-dashed border-gray-200 rounded-2xl py-4 text-sm text-gray-400 hover:border-violet-300 hover:text-violet-600 transition-colors flex items-center justify-center gap-2 font-medium"
+                >
+                  <Plus size={16} /> Nueva colaboración
+                </button>
+              </div>
+            )}
           </section>
 
           {/* ── Candidatos recientes ── */}
