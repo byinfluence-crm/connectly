@@ -214,7 +214,7 @@ function UnlockModal({
               <div className="font-bold text-gray-900 mb-1">Necesitas un plan de pago</div>
               <p className="text-sm text-gray-500 mb-5">Los perfiles bloqueados están disponibles desde el plan Starter. Accede a 15 perfiles al mes.</p>
               <div className="flex flex-col gap-2">
-                <Button fullWidth size="md" onClick={() => { onClose(); router.push('/pricing'); }}><Zap size={15} /> Ver planes — desde 29€/mes</Button>
+                <Button fullWidth size="md" onClick={() => { onClose(); router.push('/pricing'); }}><Zap size={15} /> Ver planes — desde 19€/mes</Button>
                 <Button fullWidth size="md" variant="outline" onClick={onClose}>Ahora no</Button>
               </div>
             </div>
@@ -1063,7 +1063,7 @@ export default function DiscoverPage() {
                       aria-label="Upgrade para filtros avanzados"
                     >
                       <span className="flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors">
-                        <Zap size={12} /> Desbloquear con plan Starter — desde 29€/mes
+                        <Zap size={12} /> Desbloquear con plan Starter — desde 19€/mes
                       </span>
                     </button>
                   )}

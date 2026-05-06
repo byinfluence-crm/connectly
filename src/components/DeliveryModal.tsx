@@ -1,8 +1,8 @@
 'use client';
-import { useState } from 'react';
-import { X, Plus, Trash2, ChevronRight, ChevronLeft, CheckCircle, Star, Link2 } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { X, Plus, Trash2, ChevronRight, ChevronLeft, CheckCircle, Star, Link2, ImagePlus, Loader2 } from 'lucide-react';
 import Button from '@/components/ui/Button';
-import { submitDelivery, submitInfluencerReview } from '@/lib/supabase';
+import { submitDelivery, submitInfluencerReview, uploadDeliveryScreenshot } from '@/lib/supabase';
 import type { DeliveryInput, InfluencerReviewInput } from '@/lib/supabase';
 
 // ─── Tipos internos ───────────────────────────────────────────────────────────
@@ -66,6 +66,77 @@ interface Props {
   onDone: () => void;
 }
 
+function ScreenshotUploader({
+  applicationId, influencerId, screenshots, onChange,
+}: {
+  applicationId: string;
+  influencerId: string;
+  screenshots: string[];
+  onChange: (urls: string[]) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+
+  const handleFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    setUploadError('');
+    try {
+      const urls: string[] = [];
+      for (const file of Array.from(files)) {
+        const url = await uploadDeliveryScreenshot(influencerId, applicationId, file);
+        urls.push(url);
+      }
+      onChange([...screenshots, ...urls]);
+    } catch {
+      setUploadError('Error subiendo imagen. Inténtalo de nuevo.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      {screenshots.length > 0 && (
+        <div className="grid grid-cols-3 gap-2">
+          {screenshots.map((url, i) => (
+            <div key={i} className="relative group aspect-square rounded-xl overflow-hidden border border-gray-100">
+              <img src={url} alt={`Captura ${i + 1}`} className="w-full h-full object-cover" />
+              <button
+                onClick={() => onChange(screenshots.filter((_, idx) => idx !== i))}
+                className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/heic"
+        multiple
+        className="hidden"
+        onChange={e => handleFiles(e.target.files)}
+      />
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        disabled={uploading}
+        className="flex items-center gap-2 text-sm text-violet-600 font-medium hover:text-violet-700 transition-colors disabled:opacity-50"
+      >
+        {uploading
+          ? <><Loader2 size={15} className="animate-spin" /> Subiendo...</>
+          : <><ImagePlus size={15} /> Subir capturas</>
+        }
+      </button>
+      {uploadError && <p className="text-xs text-red-500">{uploadError}</p>}
+    </div>
+  );
+}
+
 export default function DeliveryModal({
   applicationId, influencerId, brandId, brandName, collabTitle, onClose, onDone,
 }: Props) {
@@ -89,6 +160,7 @@ export default function DeliveryModal({
   const [linkClicks, setLinkClicks] = useState('');
   const [storyReplies, setStoryReplies] = useState('');
   const [stickerTaps, setStickerTaps] = useState('');
+  const [storyScreenshots, setStoryScreenshots] = useState<string[]>([]);
 
   // Step 4: valoración marca
   const [ratingComm, setRatingComm] = useState(0);
@@ -131,6 +203,7 @@ export default function DeliveryModal({
           story_replies: n(storyReplies),
           sticker_taps: n(stickerTaps),
         } : {}),
+        ...(storyScreenshots.length > 0 ? { story_screenshot_urls: storyScreenshots } : {}),
       };
 
       const overallRating = Math.round((ratingComm + ratingProf + ratingProduct) / 3);
@@ -276,7 +349,17 @@ export default function DeliveryModal({
                   <StatInput label="Sticker taps" value={stickerTaps} onChange={setStickerTaps} placeholder="ej. 42" />
                 </div>
               )}
-              {!hasStories && (
+              <div className="pt-2 border-t border-gray-100">
+                <p className="text-xs font-medium text-gray-500 mb-2">Capturas de pantalla (opcional)</p>
+                <ScreenshotUploader
+                  applicationId={applicationId}
+                  influencerId={influencerId}
+                  screenshots={storyScreenshots}
+                  onChange={setStoryScreenshots}
+                />
+              </div>
+
+              {!hasStories && storyScreenshots.length === 0 && (
                 <div className="bg-gray-50 rounded-2xl p-5 text-center">
                   <div className="text-2xl mb-2">📹</div>
                   <p className="text-sm text-gray-400">Sin stories — puedes continuar al siguiente paso.</p>

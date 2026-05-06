@@ -158,6 +158,22 @@ export default function BrandReviewModal({
                 ))}
               </div>
             )}
+            {delivery.story_screenshot_urls?.length > 0 && (
+              <div className="mt-3">
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Capturas de stories</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {delivery.story_screenshot_urls.map((url, i) => (
+                    <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                      <img
+                        src={url}
+                        alt={`Story ${i + 1}`}
+                        className="w-full aspect-square object-cover rounded-xl border border-gray-100 hover:opacity-80 transition-opacity"
+                      />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="h-px bg-gray-100" />

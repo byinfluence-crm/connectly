@@ -226,10 +226,10 @@ export default function CreatorAnalyticsPage() {
       ? Math.min(Math.round((totalCollabs / Math.max(totalCollabs, 5)) * 100), 100)
       : 0;
     return [
-      { label: 'Engagement', value: erFactor || 88, color: 'bg-violet-500' },
-      { label: 'Reseñas', value: ratingFactor || 0, color: 'bg-emerald-500' },
-      { label: 'Profesionalidad', value: punctFactor || 0, color: 'bg-amber-500' },
-      { label: 'Completación', value: completionFactor || 0, color: 'bg-blue-500' },
+      { label: 'Engagement', value: erFactor, color: 'bg-violet-500' },
+      { label: 'Reseñas', value: ratingFactor, color: 'bg-emerald-500' },
+      { label: 'Profesionalidad', value: punctFactor, color: 'bg-amber-500' },
+      { label: 'Completación', value: completionFactor, color: 'bg-blue-500' },
     ];
   })();
 
@@ -247,6 +247,8 @@ export default function CreatorAnalyticsPage() {
     );
   }
 
+  const isMock = deliveries.length === 0;
+
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-8">
 
@@ -254,38 +256,49 @@ export default function CreatorAnalyticsPage() {
         <div>
           <h1 className="text-xl font-bold text-gray-900">Panel de rendimiento</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {deliveries.length > 0
-              ? `Basado en ${deliveries.length} entregas reales`
-              : 'Datos de ejemplo — se actualizarán con tus primeras colaboraciones'}
+            {isMock ? 'Completa tu primera colaboración para ver tus datos reales' : `Basado en ${deliveries.length} entregas reales`}
           </p>
         </div>
+
+        {/* ── Banner datos de ejemplo ── */}
+        {isMock && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3.5 flex items-start gap-3">
+            <AlertCircle size={18} className="text-amber-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-amber-800">Estás viendo datos de ejemplo</p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                Estos números son orientativos. En cuanto entregues tu primera colaboración, este panel se actualizará con tus estadísticas reales.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* ── Stats resumen ── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <StatCard
             icon={<BarChart3 size={16} className="text-violet-600" />}
             label="Colaboraciones"
-            value={totalCollabs > 0 ? String(totalCollabs) : '26'}
+            value={isMock ? '—' : String(totalCollabs)}
             color="violet"
           />
           <StatCard
             icon={<Users size={16} className="text-blue-600" />}
             label="Alcance total"
-            value={totalReach > 0 ? fmt(totalReach) : '74.2K'}
+            value={isMock ? '—' : fmt(totalReach)}
             color="blue"
           />
           <StatCard
             icon={<TrendingUp size={16} className="text-emerald-600" />}
             label="Engagement rate"
-            value={avgER !== '—' ? `${avgER}%` : '8.9%'}
+            value={isMock ? '—' : (avgER !== '—' ? `${avgER}%` : '—')}
             sub="Media ponderada"
             color="emerald"
           />
           <StatCard
             icon={<Star size={16} className="text-amber-600" />}
             label="Rating medio"
-            value={avgRating !== '—' ? `${avgRating} ★` : '4.8 ★'}
-            sub={reviews.length > 0 ? `${reviews.length} reseñas` : '12 reseñas'}
+            value={isMock ? '—' : (avgRating !== '—' ? `${avgRating} ★` : '—')}
+            sub={reviews.length > 0 ? `${reviews.length} reseñas` : undefined}
             color="amber"
           />
         </div>

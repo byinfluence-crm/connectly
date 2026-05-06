@@ -259,6 +259,32 @@ export interface InfluencerProfile {
   fiscal_nif: string | null;
   fiscal_address: string | null;
   billing_email: string | null;
+  // Metrics (synced by scraper / computed by Connectly)
+  following_ig: number | null;
+  avg_likes_ig: number | null;
+  avg_views_ig: number | null;
+  avg_comments_ig: number | null;
+  views_ultimos_12_ig: number[] | null;
+  tendencia_pct_ig: number | null;
+  cpm_estimado_ig: number | null;
+  pct_seguidores_reales: number | null;
+  following_tt: number | null;
+  avg_likes_tt: number | null;
+  avg_views_tt: number | null;
+  avg_comments_tt: number | null;
+  views_ultimos_12_tt: number[] | null;
+  tendencia_pct_tt: number | null;
+  cpm_estimado_tt: number | null;
+  engagement_rate_tt: number | null;
+  quality_score: number | null;
+  autenticidad_score: number | null;
+  autenticidad_flags: string[] | null;
+  fiabilidad_score: number | null;
+  indice_eficiencia_precio: number | null;
+  cumple_plazos: 'si' | 'aveces' | 'no' | null;
+  factura_correctamente: 'si' | 'no' | null;
+  num_campanas_crm: number;
+  last_sync_at: string | null;
 }
 
 /** Profile de marca asociado a un user_id (creado automáticamente por trigger). */
@@ -1005,6 +1031,7 @@ export interface CollabDelivery {
   link_clicks: number | null;
   story_replies: number | null;
   sticker_taps: number | null;
+  story_screenshot_urls: string[];
   submitted_at: string;
 }
 
@@ -1020,6 +1047,29 @@ export interface DeliveryInput {
   link_clicks?: number;
   story_replies?: number;
   sticker_taps?: number;
+  story_screenshot_urls?: string[];
+}
+
+/**
+ * Sube una captura de story al bucket 'deliverables'.
+ * Retorna la URL pública firmada (signed, válida 1 año).
+ */
+export async function uploadDeliveryScreenshot(
+  userId: string,
+  applicationId: string,
+  file: File,
+): Promise<string> {
+  const ext = file.name.split('.').pop() ?? 'jpg';
+  const path = `${userId}/${applicationId}/${Date.now()}.${ext}`;
+  const { error } = await supabase.storage
+    .from('deliverables')
+    .upload(path, file, { upsert: false, contentType: file.type });
+  if (error) throw error;
+  const { data } = await supabase.storage
+    .from('deliverables')
+    .createSignedUrl(path, 60 * 60 * 24 * 365);
+  if (!data?.signedUrl) throw new Error('No se pudo generar la URL firmada');
+  return data.signedUrl;
 }
 
 /** Guarda la entrega del influencer y actualiza el estado de la aplicación. */

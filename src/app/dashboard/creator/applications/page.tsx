@@ -116,19 +116,19 @@ export default function ApplicationsPage() {
         ) : (
           <div className="space-y-3">
             {filtered.map(app => {
-              const collab = app.collab as { title?: string; type?: string; budget?: number | null; brand?: { display_name?: string } | null } | null;
               const statusCfg = STATUS_CONFIG[app.status as keyof typeof STATUS_CONFIG];
               const collabCfg = app.collab_status ? COLLAB_STATUS[app.collab_status] : null;
+              const brandName = app.collab?.brand?.brand_name ?? null;
 
               return (
                 <div key={app.id} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
                   <div className="flex items-start gap-3 mb-3">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-400 to-violet-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                      {(collab?.brand?.display_name ?? 'M').charAt(0).toUpperCase()}
+                      {(brandName ?? 'M').charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                        <span className="text-sm font-bold text-gray-900 truncate">{collab?.title ?? 'Colaboración'}</span>
+                        <span className="text-sm font-bold text-gray-900 truncate">{app.collab?.title ?? 'Colaboración'}</span>
                         {statusCfg && (
                           <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${statusCfg.color}`}>
                             {statusCfg.icon} {statusCfg.label}
@@ -141,9 +141,9 @@ export default function ApplicationsPage() {
                         )}
                       </div>
                       <div className="text-xs text-gray-400 flex gap-2 flex-wrap">
-                        {collab?.brand?.display_name && <span>{collab.brand.display_name}</span>}
-                        {collab?.type && <span>· {collab.type}</span>}
-                        {collab?.budget && <span>· {collab.budget}€</span>}
+                        {brandName && <span>{brandName}</span>}
+                        {app.collab?.collab_type && <span>· {app.collab.collab_type}</span>}
+                        {app.collab?.budget_min && <span>· {app.collab.budget_min}€</span>}
                         <span>· {new Date(app.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</span>
                       </div>
                     </div>

@@ -27,6 +27,7 @@ function formatDate(iso: string) {
 interface ActionPanelProps {
   otherName: string;
   planTier: PlanTier;
+  isBrand: boolean;
   offerAmount: string;
   offerDesc: string;
   sendingOffer: boolean;
@@ -40,7 +41,7 @@ interface ActionPanelProps {
 }
 
 function ActionPanel({
-  otherName, planTier, offerAmount, offerDesc, sendingOffer, sendingConnect,
+  otherName, planTier, isBrand, offerAmount, offerDesc, sendingOffer, sendingConnect,
   onOfferAmountChange, onOfferDescChange, onConnect, onSendOffer, onClose, router,
 }: ActionPanelProps) {
   const canAct = planTier !== 'free';
@@ -77,7 +78,7 @@ function ActionPanel({
             className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-white/60 rounded-none"
           >
             <Lock size={14} className="text-gray-500" />
-            <span className="text-xs font-semibold text-gray-600">Plan Starter — desde 29€/mes</span>
+            <span className="text-xs font-semibold text-gray-600">Plan Starter — desde {isBrand ? '19€' : '4€'}/mes</span>
           </button>
         )}
       </div>
@@ -121,7 +122,7 @@ function ActionPanel({
             className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-white/60 rounded-none"
           >
             <Lock size={14} className="text-gray-500" />
-            <span className="text-xs font-semibold text-gray-600">Plan Starter — desde 29€/mes</span>
+            <span className="text-xs font-semibold text-gray-600">Plan Starter — desde {isBrand ? '19€' : '4€'}/mes</span>
           </button>
         )}
       </div>
@@ -353,6 +354,7 @@ export default function ChatPage() {
             <ActionPanel
               otherName={otherName}
               planTier={planTier}
+              isBrand={!isCreator}
               offerAmount={offerAmount}
               offerDesc={offerDesc}
               sendingOffer={sendingOffer}

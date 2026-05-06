@@ -168,7 +168,7 @@ export default function CreatorDashboard() {
             </div>
             <Link href={user ? `/creators/${user.id}` : '/discover'}>
               <Button size="sm" variant="outline">
-                <User size={15} /> Mi perfil
+                <User size={15} /> Ver mi perfil
               </Button>
             </Link>
           </div>

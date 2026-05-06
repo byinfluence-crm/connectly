@@ -26,21 +26,21 @@ const BRAND_NAV: NavItem[] = [
 ];
 
 const ADMIN_NAV: NavItem[] = [
-  { label: 'Panel de agencia', href: '/dashboard/admin',                   icon: LayoutDashboard },
-  { label: 'Mis marcas',       href: '/dashboard/admin',                   icon: Building2 },
-  { label: 'Creadores',        href: '/dashboard/admin/creators',          icon: Users },
-  { label: 'Mi perfil',        href: '/dashboard/admin/settings/profile',  icon: User },
-  { label: 'Facturación',      href: '/dashboard/admin/settings/billing',  icon: CreditCard },
+  { label: 'Mis marcas',   href: '/dashboard/admin',                   icon: Building2 },
+  { label: 'Creadores',    href: '/dashboard/admin/creators',          icon: Users },
+  { label: 'Mi perfil',    href: '/dashboard/admin/settings/profile',  icon: User },
+  { label: 'Facturación',  href: '/dashboard/admin/settings/billing',  icon: CreditCard },
 ];
 
 const creatorNav = (_userId: string): NavItem[] => [
-  { label: 'Inicio',          href: '/dashboard/creator',                  icon: LayoutDashboard },
-  { label: 'Buscar',          href: '/discover',                            icon: Search },
-  { label: 'Mis aplicaciones', href: '/dashboard/creator/applications',    icon: FileText },
-  { label: 'Mensajes',        href: '/dashboard/creator/messages',          icon: MessageCircle },
-  { label: 'Analytics',       href: '/dashboard/creator/analytics',         icon: BarChart3 },
-  { label: 'Mi perfil',       href: '/dashboard/creator/settings/profile',  icon: User },
-  { label: 'Facturación',     href: '/dashboard/creator/settings/billing',  icon: CreditCard },
+  { label: 'Inicio',           href: '/dashboard/creator',                  icon: LayoutDashboard },
+  { label: 'Buscar',           href: '/discover',                            icon: Search },
+  { label: 'Mis aplicaciones', href: '/dashboard/creator/applications',     icon: FileText },
+  { label: 'Mensajes',         href: '/dashboard/creator/messages',          icon: MessageCircle },
+  { label: 'Analytics',        href: '/dashboard/creator/analytics',         icon: BarChart3 },
+  { label: 'Cobros',           href: '/dashboard/creator/payouts',           icon: CreditCard },
+  { label: 'Mi perfil',        href: '/dashboard/creator/settings/profile',  icon: User },
+  { label: 'Facturación',      href: '/dashboard/creator/settings/billing',  icon: CreditCard },
 ];
 
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
