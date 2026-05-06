@@ -101,7 +101,7 @@ export default function CandidatesPage() {
         ) : (
           <div className="space-y-3">
             {filtered.map(app => {
-              const creator = app.creator as { id?: string; display_name?: string; city?: string; niche?: string } | null;
+              const creator = app.creator;
               const collab = app.collab as { title?: string } | null;
               const cfg = STATUS_CONFIG[app.status as keyof typeof STATUS_CONFIG];
 
@@ -127,7 +127,7 @@ export default function CandidatesPage() {
                         )}
                       </div>
                       <div className="text-xs text-gray-400 flex gap-2 flex-wrap">
-                        {creator?.niche && <span>{creator.niche}</span>}
+                        {creator?.niches?.[0] && <span>{creator.niches[0]}</span>}
                         {creator?.city && <span>· {creator.city}</span>}
                         {collab?.title && <span>· {collab.title}</span>}
                         <span>· {new Date(app.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</span>
@@ -142,8 +142,8 @@ export default function CandidatesPage() {
 
                   {/* Acciones */}
                   <div className="flex gap-2 mt-3 pt-3 border-t border-gray-50">
-                    {creator?.id && (
-                      <Link href={`/creators/${creator.id}`} className="flex-shrink-0">
+                    {creator?.user_id && (
+                      <Link href={`/creators/${creator.user_id}`} className="flex-shrink-0">
                         <button className="flex items-center gap-1 px-3 py-2 rounded-xl bg-gray-50 text-gray-600 text-xs font-semibold hover:bg-gray-100 transition-colors">
                           <Star size={12} /> Ver perfil
                         </button>

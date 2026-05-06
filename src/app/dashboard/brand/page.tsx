@@ -401,10 +401,12 @@ export default function BrandDashboard() {
                 <div className="text-2xl mb-2">📭</div>
                 <div className="text-sm font-semibold text-gray-700 mb-1">Aún no tienes candidatos</div>
                 <div className="text-xs text-gray-400 mb-4">
-                  Publica una colaboración y los creadores empezarán a aplicar
+                  {collabs.length === 0
+                    ? 'Publica tu primera colaboración para que los creadores puedan aplicar'
+                    : 'Cuando los creadores apliquen a tus colaboraciones, aparecerán aquí'}
                 </div>
-                <Button size="sm" variant="secondary" onClick={() => router.push('/discover')}>
-                  Descubrir creadores
+                <Button size="sm" variant="secondary" onClick={() => router.push(collabs.length === 0 ? '/dashboard/brand/collabs/new' : '/discover')}>
+                  {collabs.length === 0 ? 'Crear colaboración' : 'Descubrir creadores'}
                 </Button>
               </div>
             )}
@@ -415,7 +417,7 @@ export default function BrandDashboard() {
             <div className="bg-gradient-to-r from-violet-600 to-violet-800 rounded-2xl p-5 flex items-center justify-between gap-4">
               <div>
                 <div className="text-white font-bold mb-1">Busca el creador perfecto</div>
-                <div className="text-violet-200 text-sm">490+ creadores verificados disponibles en tu nicho</div>
+                <div className="text-violet-200 text-sm">Encuentra creadores que encajan con tu marca y tu nicho</div>
               </div>
               <Link href="/discover">
                 <Button variant="outline" size="sm" className="border-white/40 text-white hover:bg-white/10 flex-shrink-0">
